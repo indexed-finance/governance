@@ -95,29 +95,4 @@ describe('Uni', () => {
     currectVotes1 = await uni.getCurrentVotes(other1.address)
     expect(currectVotes1).to.be.eq(expandTo18Decimals(1))
   })
-
-  it('mints', async () => {
-    const { timestamp: now } = await provider.getBlock('latest')
-    const uni = await deployContract(wallet, Uni, [wallet.address, wallet.address, now + 60 * 60])
-    const supply = await uni.totalSupply()
-
-    await expect(uni.mint(wallet.address, 1)).to.be.revertedWith('Uni::mint: minting not allowed yet')
-
-    let timestamp = await uni.mintingAllowedAfter()
-    await mineBlock(provider, timestamp.toString())
-
-    await expect(uni.connect(other1).mint(other1.address, 1)).to.be.revertedWith('Uni::mint: only the minter can mint')
-    await expect(uni.mint('0x0000000000000000000000000000000000000000', 1)).to.be.revertedWith('Uni::mint: cannot transfer to the zero address')
-
-    // can mint up to 2%
-    const mintCap = BigNumber.from(await uni.mintCap())
-    const amount = supply.mul(mintCap).div(100)
-    await uni.mint(wallet.address, amount)
-    expect(await uni.balanceOf(wallet.address)).to.be.eq(supply.add(amount))
-
-    timestamp = await uni.mintingAllowedAfter()
-    await mineBlock(provider, timestamp.toString())
-    // cannot mint 2.01%
-    await expect(uni.mint(wallet.address, supply.mul(mintCap.add(1)))).to.be.revertedWith('Uni::mint: exceeded mint cap')
-  })
 })
