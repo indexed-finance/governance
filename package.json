@@ -9,8 +9,7 @@
     "test:ndx": "buidler test ./test/Ndx.spec.js",
     "test:governor": "buidler test ./test/GovernorAlpha.spec.js",
     "test:vester": "buidler test ./test/scenarios/TreasuryVester.spec.js",
-    "lint": "prettier ./test/**/*.ts --check",
-    "prepublishOnly": "yarn test"
+    "lint": "prettier ./test/**/*.ts --check"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^3.2.0"
