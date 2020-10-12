@@ -45,7 +45,7 @@ contract StakingRewards is
     rewardsToken = IERC20(rewardsToken_);
   }
 
-  function initialize(address stakingToken_) external {
+  function initialize(address stakingToken_) external override {
     require(address(stakingToken) == address(0), "ERR_INITIALIZED");
     stakingToken = IERC20(stakingToken_);
   }
