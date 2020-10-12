@@ -2,9 +2,9 @@
   "name": "@indexed-finance/governance",
   "version": "1.0.0",
   "description": "🏛 Governance contracts for the Indexed protocol",
-  "author": "Noah Zinsmeister",
   "license": "MIT",
   "scripts": {
+    "build": "buidler compile",
     "deploy:rinkeby": "buidler --network rinkeby deploy",
     "test:ndx": "buidler test ./test/Ndx.spec.js",
     "test:governor": "buidler test ./test/GovernorAlpha.spec.js",
@@ -12,7 +12,9 @@
     "lint": "prettier ./test/**/*.ts --check"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^3.2.0"
+    "@indexed-finance/proxies": "^1.0.5",
+    "@openzeppelin/contracts": "^3.2.0",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0"
   },
   "devDependencies": {
     "@ethersproject/providers": "^5.0.9",
