@@ -106,9 +106,9 @@ contract GovernorAlpha {
 
   event ProposalExecuted(uint256 id);
 
-  constructor(address timelock_, address uni_) public {
+  constructor(address timelock_, address ndx_) public {
     timelock = TimelockInterface(timelock_);
-    ndx = NdxInterface(uni_);
+    ndx = NdxInterface(ndx_);
   }
 
   function propose(
