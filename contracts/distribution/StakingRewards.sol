@@ -140,7 +140,7 @@ contract StakingRewards is
 
   function notifyRewardAmount(uint256 reward)
     external
-    override
+    override(IStakingRewards, RewardsDistributionRecipient)
     onlyRewardsDistribution
     updateReward(address(0))
   {
