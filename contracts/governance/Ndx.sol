@@ -14,7 +14,7 @@ contract Ndx {
   uint8 public constant decimals = 18;
 
   /// @notice Total number of tokens in circulation
-  uint256 public totalSupply = 1_000_000_000e18;
+  uint256 public constant totalSupply = 10_000_000e18;
 
   mapping(address => mapping(address => uint96)) internal allowances;
 

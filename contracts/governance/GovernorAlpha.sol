@@ -1,40 +1,80 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
+import "../interfaces/ITimelock.sol";
+
+
 contract GovernorAlpha {
   /// @notice The name of this contract
   string public constant name = "Indexed Governor Alpha";
 
   /**
-   * @notice The number of votes in support of a proposal required in order for a
+   * @dev The number of votes in support of a proposal required in order for a
    * quorum to be reached and for a vote to succeed
    */ 
   function quorumVotes() public pure returns (uint256) {
-    return 40_000_000e18;
+    return 400_000e18; // 4% of NDX
   }
 
+  /**
+   * @dev The number of votes required in order for a voter to become a proposer
+   */
   function proposalThreshold() public pure returns (uint256) {
-    return 10_000_000e18;
+    return 100_000e18; // 1% of NDX
   }
 
+  /**
+   * @dev The maximum number of actions that can be included in a proposal
+   */
   function proposalMaxOperations() public pure returns (uint256) {
     return 10;
   }
 
+  /**
+   * @dev The delay before voting on a proposal may take place, once proposed
+   */
   function votingDelay() public pure returns (uint256) {
     return 1;
   }
 
+  /**
+   * @dev The duration of voting on a proposal, in blocks
+   */
   function votingPeriod() public pure returns (uint256) {
-    return 40_320;
+    return 40_320; // ~7 days in blocks (assuming 15s blocks)
   }
 
-  TimelockInterface public timelock;
+  /**
+   * @dev The address of the Indexed Protocol Timelock
+   */
+  ITimelock public timelock;
 
+  /**
+   * @dev The address of the Indexed governance token
+   */
   NdxInterface public ndx;
 
+  /**
+   * @dev The total number of proposals
+   */
   uint256 public proposalCount;
 
+  /**
+   * @param id Unique id for looking up a proposal
+   * @param proposer Creator of the proposal
+   * @param eta The timestamp that the proposal will be available for execution, set once the vote succeeds
+   * @param targets The ordered list of target addresses for calls to be made
+   * @param values The ordered list of values (i.e. msg.value) to be passed to the calls to be made
+   * @param signatures The ordered list of function signatures to be called
+   * @param calldatas The ordered list of calldata to be passed to each call
+   * @param startBlock The block at which voting begins: holders must delegate their votes prior to this block
+   * @param endBlock The block at which voting ends: votes must be cast prior to this block
+   * @param forVotes Current number of votes in favor of this proposal
+   * @param againstVotes Current number of votes in opposition to this proposal
+   * @param canceled Flag marking whether the proposal has been canceled
+   * @param executed Flag marking whether the proposal has been executed
+   * @param receipts Receipts of ballots for the entire set of voters
+   */
   struct Proposal {
     uint256 id;
     address proposer;
@@ -52,12 +92,21 @@ contract GovernorAlpha {
     mapping(address => Receipt) receipts;
   }
 
+  /**
+   * @dev Ballot receipt record for a voter
+   * @param hasVoted Whether or not a vote has been cast
+   * @param support Whether or not the voter supports the proposal
+   * @param votes The number of votes the voter had, which were cast
+   */
   struct Receipt {
     bool hasVoted;
     bool support;
     uint96 votes;
   }
 
+  /**
+   * @dev Possible states that a proposal may be in
+   */
   enum ProposalState {
     Pending,
     Active,
@@ -69,18 +118,33 @@ contract GovernorAlpha {
     Executed
   }
 
+  /**
+   * @dev The official record of all proposals ever proposed
+   */
   mapping(uint256 => Proposal) public proposals;
 
+  /**
+   * @dev The latest proposal for each proposer
+   */
   mapping(address => uint256) public latestProposalIds;
 
+  /**
+   * @dev The EIP-712 typehash for the contract's domain
+   */
   bytes32 public constant DOMAIN_TYPEHASH = keccak256(
     "EIP712Domain(string name,uint256 chainId,address verifyingContract)"
   );
 
+  /**
+   * @dev The EIP-712 typehash for the ballot struct used by the contract
+   */
   bytes32 public constant BALLOT_TYPEHASH = keccak256(
     "Ballot(uint256 proposalId,bool support)"
   );
 
+  /**
+   * @dev An event emitted when a new proposal is created
+   */
   event ProposalCreated(
     uint256 id,
     address proposer,
@@ -93,6 +157,9 @@ contract GovernorAlpha {
     string description
   );
 
+  /**
+   * @dev An event emitted when a vote has been cast on a proposal
+   */
   event VoteCast(
     address voter,
     uint256 proposalId,
@@ -100,14 +167,23 @@ contract GovernorAlpha {
     uint256 votes
   );
 
+  /**
+   * @dev An event emitted when a proposal has been canceled
+   */
   event ProposalCanceled(uint256 id);
 
+  /**
+   * @dev An event emitted when a proposal has been queued in the Timelock
+   */
   event ProposalQueued(uint256 id, uint256 eta);
 
+  /**
+   * @dev An event emitted when a proposal has been executed in the Timelock
+   */
   event ProposalExecuted(uint256 id);
 
   constructor(address timelock_, address ndx_) public {
-    timelock = TimelockInterface(timelock_);
+    timelock = ITimelock(timelock_);
     ndx = NdxInterface(ndx_);
   }
 
@@ -404,40 +480,6 @@ contract GovernorAlpha {
     }
     return chainId;
   }
-}
-
-interface TimelockInterface {
-  function delay() external view returns (uint256);
-
-  function GRACE_PERIOD() external view returns (uint256);
-
-  function acceptAdmin() external;
-
-  function queuedTransactions(bytes32 hash) external view returns (bool);
-
-  function queueTransaction(
-    address target,
-    uint256 value,
-    string calldata signature,
-    bytes calldata data,
-    uint256 eta
-  ) external returns (bytes32);
-
-  function cancelTransaction(
-    address target,
-    uint256 value,
-    string calldata signature,
-    bytes calldata data,
-    uint256 eta
-  ) external;
-
-  function executeTransaction(
-    address target,
-    uint256 value,
-    string calldata signature,
-    bytes calldata data,
-    uint256 eta
-  ) external payable returns (bytes memory);
 }
 
 interface NdxInterface {
