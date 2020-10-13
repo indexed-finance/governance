@@ -2,8 +2,10 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
+import "../interfaces/ITimelock.sol";
 
-contract Timelock {
+
+contract Timelock is ITimelock {
   using SafeMath for uint256;
 
   event NewAdmin(address indexed newAdmin);
@@ -34,15 +36,15 @@ contract Timelock {
     uint256 eta
   );
 
-  uint256 public constant GRACE_PERIOD = 14 days;
-  uint256 public constant MINIMUM_DELAY = 2 days;
-  uint256 public constant MAXIMUM_DELAY = 30 days;
+  uint256 public constant override GRACE_PERIOD = 14 days;
+  uint256 public constant override MINIMUM_DELAY = 2 days;
+  uint256 public constant override MAXIMUM_DELAY = 30 days;
 
-  address public admin;
-  address public pendingAdmin;
-  uint256 public delay;
+  address public override admin;
+  address public override pendingAdmin;
+  uint256 public override delay;
 
-  mapping(bytes32 => bool) public queuedTransactions;
+  mapping(bytes32 => bool) public override queuedTransactions;
 
   constructor(address admin_, uint256 delay_) public {
     require(
@@ -60,7 +62,7 @@ contract Timelock {
 
   fallback() external payable {}
 
-  function setDelay(uint256 delay_) public {
+  function setDelay(uint256 delay_) public override {
     require(
       msg.sender == address(this),
       "Timelock::setDelay: Call must come from Timelock."
@@ -78,7 +80,7 @@ contract Timelock {
     emit NewDelay(delay);
   }
 
-  function acceptAdmin() public {
+  function acceptAdmin() public override {
     require(
       msg.sender == pendingAdmin,
       "Timelock::acceptAdmin: Call must come from pendingAdmin."
@@ -89,7 +91,7 @@ contract Timelock {
     emit NewAdmin(admin);
   }
 
-  function setPendingAdmin(address pendingAdmin_) public {
+  function setPendingAdmin(address pendingAdmin_) public override {
     require(
       msg.sender == address(this),
       "Timelock::setPendingAdmin: Call must come from Timelock."
@@ -105,7 +107,7 @@ contract Timelock {
     string memory signature,
     bytes memory data,
     uint256 eta
-  ) public returns (bytes32) {
+  ) public override returns (bytes32) {
     require(
       msg.sender == admin,
       "Timelock::queueTransaction: Call must come from admin."
@@ -128,7 +130,7 @@ contract Timelock {
     string memory signature,
     bytes memory data,
     uint256 eta
-  ) public {
+  ) public override {
     require(
       msg.sender == admin,
       "Timelock::cancelTransaction: Call must come from admin."
@@ -146,7 +148,7 @@ contract Timelock {
     string memory signature,
     bytes memory data,
     uint256 eta
-  ) public payable returns (bytes memory) {
+  ) public payable override returns (bytes memory) {
     require(
       msg.sender == admin,
       "Timelock::executeTransaction: Call must come from admin."
