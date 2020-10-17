@@ -6,15 +6,15 @@ const TreasuryVester = require('../../artifacts/TreasuryVester.json')
 
 const { mineBlock, expandTo18Decimals } = require('../utils')
 
-describe('scenario:TreasuryVester', () => {
+describe('distribution:TreasuryVester', () => {
   const [wallet] = provider.getWallets()
 
   let ndx, timelock
 
   beforeEach(async () => {
     await deployments.fixture()
-    ndx = await ethers.getContract('ndx');
-    timelock = await ethers.getContract('timelock');
+    ndx = await ethers.getContract('Ndx');
+    timelock = await ethers.getContract('Timelock');
   })
 
   let treasuryVester
