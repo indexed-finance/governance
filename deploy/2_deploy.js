@@ -83,7 +83,7 @@ module.exports = async ({
       args: []
     });
   
-    proxyManager = await ethers.getContractAt('proxyManager', proxyManagerDeployment.address, signer);
+    proxyManager = await ethers.getContractAt('DelegateCallProxyManager', proxyManagerDeployment.address, signer);
   }
 
   const poolFactory = await deploy('MockPoolFactory', {
