@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Governance contracts for the Indexed protocol",
   "license": "MIT",
+  "repository": {
+    "url": "https://github.com/indexed-finance/governance"
+  },
   "scripts": {
     "build": "buidler compile",
     "deploy:rinkeby": "buidler --network rinkeby deploy --tags Staking",
