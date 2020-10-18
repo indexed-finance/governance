@@ -1,7 +1,7 @@
 {
   "name": "@indexed-finance/governance",
   "version": "1.0.0",
-  "description": "Governance contracts for the Indexed protocol",
+  "description": "Governance and distribution contracts for the Indexed protocol",
   "license": "MIT",
   "repository": {
     "url": "https://github.com/indexed-finance/governance"
