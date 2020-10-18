@@ -18,15 +18,17 @@ contract StakingRewards is
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
-  /* ========== IMMUTABLES ========== */
+  /* ==========  CONSTANTS  ========== */
+  uint256 public constant rewardsDuration = 60 days;
+
+  /* ==========  IMMUTABLES  ========== */
   IERC20 public immutable rewardsToken;
 
-  /* ========== STATE VARIABLES ========== */
+  /* ==========  STATE VARIABLES  ========== */
 
   IERC20 public stakingToken;
   uint256 public periodFinish = 0;
   uint256 public rewardRate = 0;
-  uint256 public rewardsDuration = 60 days;
   uint256 public lastUpdateTime;
   uint256 public rewardPerTokenStored;
 
@@ -36,7 +38,7 @@ contract StakingRewards is
   uint256 private _totalSupply;
   mapping(address => uint256) private _balances;
 
-  /* ========== CONSTRUCTOR ========== */
+  /* ==========  CONSTRUCTOR  ========== */
 
   constructor(
     address rewardsDistribution_,
@@ -46,11 +48,12 @@ contract StakingRewards is
   }
 
   function initialize(address stakingToken_) external override {
-    require(address(stakingToken) == address(0), "ERR_INITIALIZED");
+    require(address(stakingToken) == address(0), "Already initialized");
+    require(address(stakingToken_) != address(0), "Can not set null staking token");
     stakingToken = IERC20(stakingToken_);
   }
 
-  /* ========== VIEWS ========== */
+  /* ==========  VIEWS  ========== */
 
   function totalSupply() external override view returns (uint256) {
     return _totalSupply;
@@ -89,7 +92,7 @@ contract StakingRewards is
     return rewardRate.mul(rewardsDuration);
   }
 
-  /* ========== MUTATIVE FUNCTIONS ========== */
+  /* ==========  MUTATIVE FUNCTIONS  ========== */
 
   function stake(uint256 amount)
     external
