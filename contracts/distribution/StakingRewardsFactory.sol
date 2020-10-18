@@ -63,10 +63,10 @@ contract StakingRewardsFactory is Owned {
   uint256 public immutable stakingRewardsGenesis;
 
   /* ==========  Events  ========== */
-  event StakingRewardsAdded(address stakingToken, address stakingRewards);
+  event StakingRewardsAdded(StakingTokenType tokenType, address stakingToken, address stakingRewards);
 
   /* ==========  Structs  ========== */
-  enum StakingTokenType { NDX_POOL_UNISWAP_PAIR, NDX_POOL }
+  enum StakingTokenType { NDX_POOL, NDX_POOL_UNISWAP_PAIR }
 
   struct StakingRewardsInfo {
     StakingTokenType tokenType;
@@ -141,7 +141,7 @@ contract StakingRewardsFactory is Owned {
     info.rewardAmount = rewardAmount;
     info.tokenType = StakingTokenType.NDX_POOL;
     stakingTokens.push(indexPool);
-    emit StakingRewardsAdded(indexPool, stakingRewards);
+    emit StakingRewardsAdded(StakingTokenType.NDX_POOL, indexPool, stakingRewards);
   }
 
   /**
@@ -158,15 +158,14 @@ contract StakingRewardsFactory is Owned {
   ) external _owner_ {
     require(
       poolFactory.isIPool(indexPool),
-      "StakingRewardsFactory::deploystakingRewardsForIndexUniswapPair: Not an index pool."
+      "StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Not an index pool."
     );
 
     address pairAddress = UniswapV2AddressLibrary.pairFor(
-      address(poolFactory),
+      address(uniswapFactory),
       indexPool,
       weth
     );
-
 
     StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[pairAddress];
     require(
@@ -180,11 +179,12 @@ contract StakingRewardsFactory is Owned {
       stakingRewardsSalt
     );
 
-    IStakingRewards(stakingRewards).initialize(indexPool);
+    IStakingRewards(stakingRewards).initialize(pairAddress);
     info.stakingRewards = stakingRewards;
     info.rewardAmount = rewardAmount;
     info.tokenType = StakingTokenType.NDX_POOL_UNISWAP_PAIR;
     stakingTokens.push(pairAddress);
+    emit StakingRewardsAdded(StakingTokenType.NDX_POOL_UNISWAP_PAIR, pairAddress, stakingRewards);
   }
 
   /* ==========  Rewards  ========== */
