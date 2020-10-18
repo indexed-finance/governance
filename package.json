@@ -1,19 +1,23 @@
 {
   "name": "@indexed-finance/governance",
   "version": "1.0.0",
-  "description": "🏛 Governance contracts for the Indexed protocol",
+  "description": "Governance contracts for the Indexed protocol",
   "license": "MIT",
   "scripts": {
     "build": "buidler compile",
-    "deploy:rinkeby": "buidler --network rinkeby deploy",
+    "deploy:rinkeby": "buidler --network rinkeby deploy --tags Staking",
     "test:ndx": "buidler test ./test/Ndx.spec.js",
     "test:governor": "buidler test ./test/GovernorAlpha.spec.js",
-    "test:vester": "buidler test ./test/scenarios/TreasuryVester.spec.js",
+    "test:vester": "buidler test ./test/distribution/TreasuryVester.spec.js",
+    "test:reservoir": "buidler test ./test/distribution/Reservoir.spec.js",
+    "test:rewards": "buidler test ./test/distribution/StakingRewards.spec.js",
+    "test:rewards-factory": "buidler test ./test/distribution/StakingRewardsFactory.spec.js",
     "lint": "prettier ./test/**/*.ts --check"
   },
   "dependencies": {
-    "@indexed-finance/proxies": "^1.0.5",
+    "@indexed-finance/proxies": "^1.0.7",
     "@openzeppelin/contracts": "^3.2.0",
+    "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0"
   },
   "devDependencies": {
@@ -26,7 +30,9 @@
     "buidler-ethers-v5": "^0.2.2",
     "buidler-gas-reporter": "^0.1.3",
     "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
     "chalk": "^4.1.0",
+    "cli-table3": "^0.6.0",
     "decimal.js": "^10.2.0",
     "dotenv": "^8.2.0",
     "ethereum-waffle": "^3.0.2",
