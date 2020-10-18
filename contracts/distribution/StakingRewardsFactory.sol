@@ -5,42 +5,76 @@ import "@indexed-finance/proxies/contracts/interfaces/IDelegateCallProxyManager.
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /* ---  External Libraries  --- */
-import { SaltyLib as Salty } from  "@indexed-finance/proxies/contracts/SaltyLib.sol";
+import {SaltyLib as Salty} from "@indexed-finance/proxies/contracts/SaltyLib.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@uniswap/v2-periphery/contracts/libraries/UniswapV2Library.sol";
 
 /* ---  Internal Interfaces  --- */
 import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IStakingRewards.sol";
 
+/* ---  Internal Libraries  --- */
+import {UniswapV2AddressLibrary} from "../lib/UniswapV2AddressLibrary.sol";
+
 /* ---  Inheritance  --- */
 import "../lib/Owned.sol";
 
-
 contract StakingRewardsFactory is Owned {
-  using SafeMath for uint;
+  using SafeMath for uint256;
 
-/* ---  Constants  --- */
-  bytes32 public constant STAKING_REWARDS_IMPLEMENTATION_ID = keccak256("StakingRewards.sol");
-  uint256 internal constant POINTS_MULTIPLIER = 10**18;
+/* ==========  Constants  ========== */
+  /**
+   * @dev Used to identify the implementation for staking rewards proxies.
+   */
+  bytes32 public constant STAKING_REWARDS_IMPLEMENTATION_ID = keccak256(
+    "StakingRewards.sol"
+  );
 
-/* ---  Immutables  --- */
+  /* ==========  Immutables  ========== */
+  /**
+   * @dev Address of the pool factory - used to verify staking token eligibility.
+   */
   IPoolFactory public immutable poolFactory;
+
+  /**
+   * @dev The address of the proxy manager - used to deploy staking pools.
+   */
   IDelegateCallProxyManager public immutable proxyManager;
+
+  /**
+   * @dev The address of the token to distribute.
+   */
   address public immutable rewardsToken;
+
+  /**
+   * @dev The address of the Uniswap factory - used to compute the addresses
+   * of Uniswap pairs eligible for distribution.
+   */
   address public immutable uniswapFactory;
+
+  /**
+   * @dev The address of the wrapped ether token - used to identify
+   * Uniswap pairs eligible for distribution.
+   */
   address public immutable weth;
 
-/* ---  Events  --- */
-  event RewardsUpdated(address stakingPool, uint256 rewardsAdded);
+  /**
+   * @dev Timestamp at which staking begins.
+   */
+  uint256 public immutable stakingRewardsGenesis;
 
-/* ---  Structs  --- */
-  struct RewardsData {
-    uint96 totalRewards;
-    uint160 totalRewardPoints;
+  /* ==========  Events  ========== */
+  event StakingRewardsAdded(address stakingToken, address stakingRewards);
+
+  /* ==========  Structs  ========== */
+  enum StakingTokenType { NDX_POOL_UNISWAP_PAIR, NDX_POOL }
+
+  struct StakingRewardsInfo {
+    StakingTokenType tokenType;
+    address stakingRewards;
+    uint88 rewardAmount;
   }
 
-/* ---  Storage  --- */
+  /* ==========  Storage  ========== */
 
   /**
    * @dev The staking tokens for which the rewards contract has been deployed.
@@ -48,26 +82,25 @@ contract StakingRewardsFactory is Owned {
   address[] public stakingTokens;
 
   /**
-   * @dev Metadata about all distributions.
+   * @dev Rewards info by staking token.
    */
-  RewardsData internal _rewards;
+  mapping(address => StakingRewardsInfo) public stakingRewardsInfoByStakingToken;
 
-  /**
-   * @dev Total points claimed by each staking pool.
-   */
-  mapping(address => uint256) internal _lastRewardPoints;
-
-/* ---  Constructor  --- */
+  /* ==========  Constructor  ========== */
   constructor(
     address owner_,
     address rewardsToken_,
-    uint stakingRewardsGenesis_,
+    uint256 stakingRewardsGenesis_,
     address proxyManager_,
     address poolFactory_,
     address uniswapFactory_,
     address weth_
   ) public Owned(owner_) {
     rewardsToken = rewardsToken_;
+    require(
+      stakingRewardsGenesis_ >= block.timestamp,
+      "StakingRewardsFactory::constructor: genesis too soon"
+    );
     stakingRewardsGenesis = stakingRewardsGenesis_;
     proxyManager = IDelegateCallProxyManager(proxyManager_);
     poolFactory = IPoolFactory(poolFactory_);
@@ -75,71 +108,144 @@ contract StakingRewardsFactory is Owned {
     weth = weth_;
   }
 
-  function deployStakingPoolForIndex(address indexPool) external _owner_ {
-    require(poolFactory.isIPool(indexPool), "Error: Not an index pool.");
-    bytes32 stakingPoolSalt = keccak256(abi.encode(indexPool));
-    address stakingPool = proxyManager.deployProxyManyToOne(
-      STAKING_REWARDS_IMPLEMENTATION_ID,
-      stakingPoolSalt
-    );
-    IStakingRewards(stakingPool).initialize(indexPool);
-    stakingTokens.push(indexPool);
-    _lastRewardPoints[stakingPool] = _rewards.totalRewardPoints;
-  }
-
-  function deployStakingPoolForIndexUniswapPair(address indexPool) external _owner_ {
-    require(poolFactory.isIPool(indexPool), "Error: Not an index pool.");
-    address pairAddress = UniswapV2Library.pairFor(poolFactory, indexPool, weth);
-    bytes32 stakingPoolSalt = keccak256(abi.encode(pairAddress));
-    address stakingPool = proxyManager.deployProxyManyToOne(
-      STAKING_REWARDS_IMPLEMENTATION_ID,
-      stakingPoolSalt
-    );
-    stakingTokens.push(pairAddress);
-    _lastRewardPoints[stakingPool] = _rewards.totalRewardPoints;
-  }
-
-/* ---  Reward Actions  --- */
+  /* ==========  Pool Deployment  ==========  */
+  // Pool deployment functions are permissioned.
 
   /**
-   * @dev Updates the rewards with new tokens to distribute.
+   * @dev Deploys a staking pool for the LP token of an index pool.
    *
-   * Note: This assumes that the maximum total tokens distributed through the
-   * rewards contract is less than 2**96 - 1
+   * Verifies that the staking token is the address of a pool deployed by the
+   * Indexed pool factory.
    */
-  function addRewards() external {
-    RewardsData memory rewards = _rewards;
-    uint256 balance = IERC20(rewardsToken).balanceOf(address(this));
-    uint256 amount = balance.sub(rewards.totalRewards);
-    require(amount > 0, "Error: No new rewards to distribute.");
-    rewards.totalRewards = uint96(balance);
-    uint256 newPoints = (amount * POINTS_MULTIPLIER) / stakingTokens.length;
-    rewards.totalRewardPoints = uint160(rewards.totalRewardPoints + newPoints);
-    _rewards = rewards;
+  function deployStakingRewardsForPool(address indexPool, uint88 rewardAmount)
+    external
+    _owner_
+  {
+
+    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[indexPool];
+    require(
+      info.stakingRewards == address(0),
+      "StakingRewardsFactory::deployStakingRewardsForPool: Already deployed"
+    );
+    require(
+      poolFactory.isIPool(indexPool),
+      "StakingRewardsFactory::deployStakingRewardsForPool: Not an index pool."
+    );
+    bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(indexPool));
+    address stakingRewards = proxyManager.deployProxyManyToOne(
+      STAKING_REWARDS_IMPLEMENTATION_ID,
+      stakingRewardsSalt
+    );
+    IStakingRewards(stakingRewards).initialize(indexPool);
+    info.stakingRewards = stakingRewards;
+    info.rewardAmount = rewardAmount;
+    info.tokenType = StakingTokenType.NDX_POOL;
+    stakingTokens.push(indexPool);
+    emit StakingRewardsAdded(indexPool, stakingRewards);
   }
 
-  function notifyRewardAmount(address stakingPool) public {
-    RewardsData memory rewards = _rewards;
-    uint256 newPoints = rewards.totalRewardPoints.sub(_lastRewardPoints[stakingPool]);
-    uint256 owed = newPoints / POINTS_MULTIPLIER;
-    _lastRewardPoints[stakingPool] = rewards.totalRewardPoints;
-    if (owed > 0) {
-      IStakingRewards(stakingPool).notifyRewardAmount(owed);
+  /**
+   * @dev Deploys staking rewards for the LP token of the Uniswap pair between an
+   * index pool token and WETH.
+   *
+   * Verifies that the LP token is the address of a pool deployed by the
+   * Indexed pool factory, then uses the address of the Uniswap pair between
+   * it and WETH as the staking token.
+   */
+  function deployStakingRewardsForPoolUniswapPair(
+    address indexPool,
+    uint88 rewardAmount
+  ) external _owner_ {
+    require(
+      poolFactory.isIPool(indexPool),
+      "StakingRewardsFactory::deploystakingRewardsForIndexUniswapPair: Not an index pool."
+    );
+
+    address pairAddress = UniswapV2AddressLibrary.pairFor(
+      address(poolFactory),
+      indexPool,
+      weth
+    );
+
+
+    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[pairAddress];
+    require(
+      info.stakingRewards == address(0),
+      "StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Already deployed"
+    );
+
+    bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(pairAddress));
+    address stakingRewards = proxyManager.deployProxyManyToOne(
+      STAKING_REWARDS_IMPLEMENTATION_ID,
+      stakingRewardsSalt
+    );
+
+    IStakingRewards(stakingRewards).initialize(indexPool);
+    info.stakingRewards = stakingRewards;
+    info.rewardAmount = rewardAmount;
+    info.tokenType = StakingTokenType.NDX_POOL_UNISWAP_PAIR;
+    stakingTokens.push(pairAddress);
+  }
+
+  /* ==========  Rewards  ========== */
+
+  function notifyRewardAmounts() public {
+    require(
+      stakingTokens.length > 0,
+      "StakingRewardsFactory::notifyRewardAmounts: called before any deploys"
+    );
+    for (uint i = 0; i < stakingTokens.length; i++) {
+      notifyRewardAmount(stakingTokens[i]);
     }
   }
 
-/* ---  Reward Queries  --- */
-  function rewardsOwed(address stakingPool) public view returns (uint256) {
-    uint256 newPoints = _rewards.totalRewardPoints.sub(_lastRewardPoints[stakingPool]);
-    return newPoints.div(POINTS_MULTIPLIER);
+  function notifyRewardAmount(address stakingToken) public {
+    require(
+      block.timestamp >= stakingRewardsGenesis,
+      "StakingRewardsFactory::notifyRewardAmount: Not ready"
+    );
+
+    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
+    require(
+      info.stakingRewards != address(0),
+      "StakingRewardsFactory::notifyRewardAmount: Not deployed"
+    );
+
+    if (info.rewardAmount > 0) {
+      uint256 rewardAmount = info.rewardAmount;
+      info.rewardAmount = 0;
+
+      require(
+        IERC20(rewardsToken).transfer(info.stakingRewards, rewardAmount),
+        "StakingRewardsFactory::notifyRewardAmount: Transfer failed"
+      );
+      IStakingRewards(info.stakingRewards).notifyRewardAmount(rewardAmount);
+    }
   }
 
-  function getStakingPool(address stakingToken) public view returns (address) {
+  /* ==========  Queries  ========== */
+
+  function getStakingTokens() external view returns (address[] memory) {
+    return stakingTokens;
+  }
+
+  function getStakingRewards(address stakingToken) external view returns (address) {
+    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
+    require(
+      info.stakingRewards != address(0),
+      "StakingRewardsFactory::getStakingRewards: Not deployed"
+    );
+
+    return info.stakingRewards;
+  }
+
+  function computeStakingRewardsAddress(address stakingToken) external view returns (address) {
+    bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(stakingToken));
     return Salty.computeProxyAddressManyToOne(
       address(proxyManager),
       address(this),
       STAKING_REWARDS_IMPLEMENTATION_ID,
-      keccak256(abi.encode(stakingToken))
+      stakingRewardsSalt
     );
   }
 }
