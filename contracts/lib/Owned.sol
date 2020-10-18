@@ -13,6 +13,7 @@ contract Owned {
   }
 
   constructor(address owner) public {
+    require(owner != address(0), "ERR_NULL_ADDRESS");
     _owner = owner;
   }
 
