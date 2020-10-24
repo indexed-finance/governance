@@ -1,5 +1,6 @@
-const { BigNumber } = require('ethers');
+const { BigNumber, Wallet } = require('ethers');
 const { formatEther } = require('ethers/lib/utils');
+const { randomBytes } = require('crypto');
 
 const DELAY = 60 * 60 * 24 * 2
 
@@ -20,8 +21,19 @@ function from18Decimals(n) {
   return formatEther(n);
 }
 
+async function getWallets(ethers, num) {
+  let wallets = [];
+  for (let i = 0; i < num; i++) {
+    const wallet = new Wallet(randomBytes(32));
+    await wallet.connect(ethers.provider);
+    wallets.push(wallet);
+  }
+  return wallets;
+}
+
 module.exports = {
   DELAY,
+  getWallets,
   mineBlock,
   expandTo18Decimals,
   from18Decimals,
