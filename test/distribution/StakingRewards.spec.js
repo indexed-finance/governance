@@ -1,5 +1,6 @@
 const chai = require('chai');
 const { BigNumber } = require("ethers");
+const { formatEther } = require('ethers/lib/utils');
 
 chai.use(require('chai-as-promised'));
 const { expect } = chai;
@@ -228,10 +229,10 @@ describe('distribution:StakingRewards', async () => {
     });
     
     it('gives nothing for user with no owed rewards', async () => {
-      const stakerAddress = await stakingAccount1.getAddress();
+      const stakerAddress = await stakingAccount2.getAddress();
 			const initialRewardBal = await rewardsToken.balanceOf(stakerAddress);
-			await rewards.connect(stakingAccount1).getReward();
-			const postRewardBal = await rewardsToken.balanceOf(stakerAddress);
+			await rewards.connect(stakingAccount2).getReward();
+      const postRewardBal = await rewardsToken.balanceOf(stakerAddress);
       expect(postRewardBal.eq(initialRewardBal)).to.be.true;
     });
   });
