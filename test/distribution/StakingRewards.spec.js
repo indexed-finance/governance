@@ -1,10 +1,9 @@
-const bre = require("@nomiclabs/buidler");
 const chai = require('chai');
 const { BigNumber } = require("ethers");
 
 chai.use(require('chai-as-promised'));
 const { expect } = chai;
-const { ethers, waffle: { provider } } = bre;
+const { provider } = ethers;
 const { expandTo18Decimals, fastForward } = require('../utils')
 
 describe('distribution:StakingRewards', async () => {
@@ -226,7 +225,15 @@ describe('distribution:StakingRewards', async () => {
 			const postEarnedBal = await rewards.earned(stakerAddress);
       expect(postEarnedBal.lt(initialEarnedBal)).to.be.true;
       expect(postRewardBal.gt(initialRewardBal)).to.be.true;
-		});
+    });
+    
+    it('gives nothing for user with no owed rewards', async () => {
+      const stakerAddress = await stakingAccount1.getAddress();
+			const initialRewardBal = await rewardsToken.balanceOf(stakerAddress);
+			await rewards.connect(stakingAccount1).getReward();
+			const postRewardBal = await rewardsToken.balanceOf(stakerAddress);
+      expect(postRewardBal.eq(initialRewardBal)).to.be.true;
+    });
   });
   
   describe('getRewardForDuration()', () => {
