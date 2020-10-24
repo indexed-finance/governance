@@ -1,13 +1,16 @@
 pragma solidity ^0.6.0;
 
+/* ==========  External Libraries  ========== */
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+
+/* ==========  External Inheritance  ========== */
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-// Inheritance
-import "../interfaces/IStakingRewards.sol";
+/* ==========  Internal Inheritance  ========== */
 import "./RewardsDistributionRecipient.sol";
+import "../interfaces/IStakingRewards.sol";
 
 
 contract StakingRewards is
@@ -23,6 +26,13 @@ contract StakingRewards is
 
   /* ==========  IMMUTABLES  ========== */
   IERC20 public immutable rewardsToken;
+
+  /* ========== EVENTS ========== */
+
+  event RewardAdded(uint256 reward);
+  event Staked(address indexed user, uint256 amount);
+  event Withdrawn(address indexed user, uint256 amount);
+  event RewardPaid(address indexed user, uint256 reward);
 
   /* ==========  STATE VARIABLES  ========== */
 
@@ -181,11 +191,4 @@ contract StakingRewards is
     }
     _;
   }
-
-  /* ========== EVENTS ========== */
-
-  event RewardAdded(uint256 reward);
-  event Staked(address indexed user, uint256 amount);
-  event Withdrawn(address indexed user, uint256 amount);
-  event RewardPaid(address indexed user, uint256 reward);
 }
