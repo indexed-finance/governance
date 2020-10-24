@@ -21,20 +21,34 @@ contract StakingRewards is
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
-  /* ==========  CONSTANTS  ========== */
+/* ==========  Constants  ========== */
+
   uint256 public constant rewardsDuration = 60 days;
 
-  /* ==========  IMMUTABLES  ========== */
+/* ==========  Immutables  ========== */
+
   IERC20 public immutable rewardsToken;
 
-  /* ========== EVENTS ========== */
+/* ========== Events ========== */
 
   event RewardAdded(uint256 reward);
   event Staked(address indexed user, uint256 amount);
   event Withdrawn(address indexed user, uint256 amount);
   event RewardPaid(address indexed user, uint256 reward);
 
-  /* ==========  STATE VARIABLES  ========== */
+/* ========== Modifiers ========== */
+
+  modifier updateReward(address account) {
+    rewardPerTokenStored = rewardPerToken();
+    lastUpdateTime = lastTimeRewardApplicable();
+    if (account != address(0)) {
+      rewards[account] = earned(account);
+      userRewardPerTokenPaid[account] = rewardPerTokenStored;
+    }
+    _;
+  }
+
+/* ==========  State Variables  ========== */
 
   IERC20 public stakingToken;
   uint256 public periodFinish = 0;
@@ -48,7 +62,7 @@ contract StakingRewards is
   uint256 private _totalSupply;
   mapping(address => uint256) private _balances;
 
-  /* ==========  CONSTRUCTOR  ========== */
+/* ==========  Constructor  ========== */
 
   constructor(
     address rewardsDistribution_,
@@ -63,46 +77,7 @@ contract StakingRewards is
     stakingToken = IERC20(stakingToken_);
   }
 
-  /* ==========  VIEWS  ========== */
-
-  function totalSupply() external override view returns (uint256) {
-    return _totalSupply;
-  }
-
-  function balanceOf(address account) external override view returns (uint256) {
-    return _balances[account];
-  }
-
-  function lastTimeRewardApplicable() public override view returns (uint256) {
-    return Math.min(block.timestamp, periodFinish);
-  }
-
-  function rewardPerToken() public override view returns (uint256) {
-    if (_totalSupply == 0) {
-      return rewardPerTokenStored;
-    }
-    return
-      rewardPerTokenStored.add(
-        lastTimeRewardApplicable()
-          .sub(lastUpdateTime)
-          .mul(rewardRate)
-          .mul(1e18)
-          .div(_totalSupply)
-      );
-  }
-
-  function earned(address account) public override view returns (uint256) {
-    return _balances[account]
-      .mul(rewardPerToken().sub(userRewardPerTokenPaid[account]))
-      .div(1e18)
-      .add(rewards[account]);
-  }
-
-  function getRewardForDuration() external override view returns (uint256) {
-    return rewardRate.mul(rewardsDuration);
-  }
-
-  /* ==========  MUTATIVE FUNCTIONS  ========== */
+/* ==========  Mutative Functions  ========== */
 
   function stake(uint256 amount)
     external
@@ -149,7 +124,7 @@ contract StakingRewards is
     getReward();
   }
 
-  /* ========== RESTRICTED FUNCTIONS ========== */
+/* ========== Restricted Functions ========== */
 
   function notifyRewardAmount(uint256 reward)
     external
@@ -180,15 +155,42 @@ contract StakingRewards is
     emit RewardAdded(reward);
   }
 
-  /* ========== MODIFIERS ========== */
+/* ==========  Views  ========== */
 
-  modifier updateReward(address account) {
-    rewardPerTokenStored = rewardPerToken();
-    lastUpdateTime = lastTimeRewardApplicable();
-    if (account != address(0)) {
-      rewards[account] = earned(account);
-      userRewardPerTokenPaid[account] = rewardPerTokenStored;
+  function totalSupply() external override view returns (uint256) {
+    return _totalSupply;
+  }
+
+  function balanceOf(address account) external override view returns (uint256) {
+    return _balances[account];
+  }
+
+  function lastTimeRewardApplicable() public override view returns (uint256) {
+    return Math.min(block.timestamp, periodFinish);
+  }
+
+  function rewardPerToken() public override view returns (uint256) {
+    if (_totalSupply == 0) {
+      return rewardPerTokenStored;
     }
-    _;
+    return
+      rewardPerTokenStored.add(
+        lastTimeRewardApplicable()
+          .sub(lastUpdateTime)
+          .mul(rewardRate)
+          .mul(1e18)
+          .div(_totalSupply)
+      );
+  }
+
+  function earned(address account) public override view returns (uint256) {
+    return _balances[account]
+      .mul(rewardPerToken().sub(userRewardPerTokenPaid[account]))
+      .div(1e18)
+      .add(rewards[account]);
+  }
+
+  function getRewardForDuration() external override view returns (uint256) {
+    return rewardRate.mul(rewardsDuration);
   }
 }
