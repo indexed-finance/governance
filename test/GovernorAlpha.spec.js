@@ -1,26 +1,28 @@
 const bre = require("@nomiclabs/buidler");
 const { expect } = require('chai')
 const { constants } = require('ethers')
-const { deployments, ethers, waffle: { provider } } = bre;
+const { deployments, ethers } = bre;
 
 const { DELAY } = require('./utils');
 
 describe('GovernorAlpha', () => {
-  const [wallet] = provider.getWallets()
+  let wallet, address;
 
   let ndx, timelock, governorAlpha;
 
   beforeEach(async () => {
     await deployments.fixture();
-    ndx = await ethers.getContract('ndx');
-    timelock = await ethers.getContract('timelock');
-    governorAlpha = await ethers.getContract('governorAlpha');
+    ndx = await ethers.getContract('Ndx');
+    timelock = await ethers.getContract('Timelock');
+    governorAlpha = await ethers.getContract('GovernorAlpha');
+    [wallet] = await ethers.getSigners();
+    address = await wallet.getAddress();
   })
 
   it('ndx', async () => {
-    const balance = await ndx.balanceOf(wallet.address)
+    const balance = await ndx.balanceOf(address)
     const totalSupply = await ndx.totalSupply()
-    expect(balance).to.be.eq(totalSupply)
+    expect(balance.eq(totalSupply)).to.be.true;
   })
 
   it('timelock', async () => {
@@ -29,12 +31,12 @@ describe('GovernorAlpha', () => {
     const pendingAdmin = await timelock.pendingAdmin()
     expect(pendingAdmin).to.be.eq(constants.AddressZero)
     const delay = await timelock.delay()
-    expect(delay).to.be.eq(DELAY)
+    expect(delay.eq(DELAY)).to.be.true;
   })
 
   it('governor', async () => {
     const votingPeriod = await governorAlpha.votingPeriod()
-    expect(votingPeriod).to.be.eq(40320)
+    expect(votingPeriod.eq(40320)).to.be.true;
     const timelockAddress = await governorAlpha.timelock()
     expect(timelockAddress).to.be.eq(timelock.address)
     const uniFromGovernor = await governorAlpha.ndx()
