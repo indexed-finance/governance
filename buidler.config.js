@@ -206,7 +206,13 @@ module.exports = {
       'node_modules/@indexed-finance/proxies/artifacts'
     ],
     deployments: {
-      rinkeby: ['node_modules/@indexed-finance/proxies/deployments/rinkeby']
+      rinkeby: [
+        "node_modules/@indexed-finance/proxies/deployments/rinkeby",
+        "node_modules/@indexed-finance/uniswap-deployments/rinkeby"
+      ],
+      mainnet: [
+        "node_modules/@indexed-finance/uniswap-deployments/rinkeby"
+      ]
     }
   },
   networks: {
