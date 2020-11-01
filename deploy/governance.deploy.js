@@ -21,10 +21,8 @@ module.exports = async ({
 }) => {
   const { deployer } = await getNamedAccounts();
   const chainID = await getChainId();
-
-
   /* Testnet uses a delay of 20 minutes */
-  const [timelockContract, DELAY] = (chainID == 1)
+  const [timelockContract, DELAY] = (chainID != 4)
     ? ['Timelock', 60 * 60 * 24 * 2]
     : ['MockTimelock', 20 * 60];
 
