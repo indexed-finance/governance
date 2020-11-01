@@ -12,7 +12,7 @@ const { randomBytes } = require('crypto');
 const { types, task } = require('@nomiclabs/buidler/config');
 const { expandTo18Decimals, from18Decimals, fastForward } = require('./test/utils');
 
-usePlugin('@nomiclabs/buidler-waffle');
+// usePlugin('@nomiclabs/buidler-waffle');
 usePlugin('buidler-ethers-v5');
 usePlugin('buidler-deploy');
 usePlugin('buidler-abi-exporter');
@@ -139,10 +139,10 @@ task('deploy-staking-pool', 'Deploys a staking pool using the factory')
     const erc20 = await ethers.getContractAt('MockERC20', token, signer);
     await erc20.getFreeTokens(stakingFactory.address, rewardValue);
     const genesis = await stakingFactory.stakingRewardsGenesis();
-    const { timestamp } = await waffle.provider.getBlock('latest');
+    const { timestamp } = await ethers.provider.getBlock('latest');
     if (genesis > timestamp) {
       const diff = genesis - timestamp;
-      await fastForward(waffle.provider, diff);
+      await fastForward(ethers.provider, diff);
     }
     await stakingRewards.notifyRewardAmount(token);
     const symbol = await erc20.symbol();
@@ -181,7 +181,7 @@ task('fast-forward', 'Move the node\'s clock forward')
     totalSeconds += (days || 0) * 86400;
     if (totalSeconds == 0) totalSeconds = 3600;
     const duration = withPadding(moment.duration(totalSeconds, 'seconds'));
-    await fastForward(waffle.provider, totalSeconds);
+    await fastForward(ethers.provider, totalSeconds);
     // moment.duration(totalSeconds, 'seconds').format('h:mm:ss');
     console.log(`Moved the node clock forward by ${duration}`)
   });
@@ -206,9 +206,7 @@ module.exports = {
       'node_modules/@indexed-finance/proxies/artifacts'
     ],
     deployments: {
-      rinkeby: [
-        'node_modules/@indexed-finance/proxies/deployments/rinkeby'
-      ]
+      rinkeby: ['node_modules/@indexed-finance/proxies/deployments/rinkeby']
     }
   },
   networks: {
@@ -222,7 +220,11 @@ module.exports = {
         port: 8545,
         hostname: 'localhost',
       }),
-      // chainId: 
+    },
+    mainnet: {
+      url: new InfuraProvider('mainnet', process.env.INFURA_PROJECT_ID).connection.url,
+      accounts: [keys.rinkeby],
+      chainId: 1
     },
     rinkeby: {
       url: new InfuraProvider('rinkeby', process.env.INFURA_PROJECT_ID).connection.url,
@@ -246,7 +248,7 @@ module.exports = {
     deployments: path.join(__dirname, 'deployments')
   },
   solc: {
-    version: '0.6.8',
+    version: '0.6.12',
     optimizer: {
       enabled: true,
       runs: 200
