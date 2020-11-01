@@ -1,71 +1,88 @@
 pragma solidity ^0.6.0;
 
-/* ---  External Interfaces  --- */
+/* ==========  External Interfaces  ========== */
 import "@indexed-finance/proxies/contracts/interfaces/IDelegateCallProxyManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/* ---  External Libraries  --- */
-import {SaltyLib as Salty} from "@indexed-finance/proxies/contracts/SaltyLib.sol";
+/* ==========  External Libraries  ========== */
+import "@indexed-finance/proxies/contracts/SaltyLib.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-/* ---  Internal Interfaces  --- */
+/* ==========  External Inheritance  ========== */
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+/* ==========  Internal Interfaces  ========== */
 import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IStakingRewards.sol";
 
-/* ---  Internal Libraries  --- */
-import {UniswapV2AddressLibrary} from "../lib/UniswapV2AddressLibrary.sol";
+/* ==========  Internal Libraries  ========== */
+import "../lib/UniswapV2AddressLibrary.sol";
 
-/* ---  Inheritance  --- */
-import "../lib/Owned.sol";
+/* ==========  Internal Inheritance  ========== */
+import "../interfaces/IStakingRewardsFactory.sol";
 
-contract StakingRewardsFactory is Owned {
+
+contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
   using SafeMath for uint256;
 
 /* ==========  Constants  ========== */
+
   /**
    * @dev Used to identify the implementation for staking rewards proxies.
    */
-  bytes32 public constant STAKING_REWARDS_IMPLEMENTATION_ID = keccak256(
+  bytes32 public override constant STAKING_REWARDS_IMPLEMENTATION_ID = keccak256(
     "StakingRewards.sol"
   );
 
-  /* ==========  Immutables  ========== */
+/* ==========  Immutables  ========== */
+
   /**
    * @dev Address of the pool factory - used to verify staking token eligibility.
    */
-  IPoolFactory public immutable poolFactory;
+  IPoolFactory public override immutable poolFactory;
 
   /**
    * @dev The address of the proxy manager - used to deploy staking pools.
    */
-  IDelegateCallProxyManager public immutable proxyManager;
+  IDelegateCallProxyManager public override immutable proxyManager;
 
   /**
    * @dev The address of the token to distribute.
    */
-  address public immutable rewardsToken;
+  address public override immutable rewardsToken;
 
   /**
    * @dev The address of the Uniswap factory - used to compute the addresses
    * of Uniswap pairs eligible for distribution.
    */
-  address public immutable uniswapFactory;
+  address public override immutable uniswapFactory;
 
   /**
    * @dev The address of the wrapped ether token - used to identify
    * Uniswap pairs eligible for distribution.
    */
-  address public immutable weth;
+  address public override immutable weth;
 
   /**
    * @dev Timestamp at which staking begins.
    */
-  uint256 public immutable stakingRewardsGenesis;
+  uint256 public override immutable stakingRewardsGenesis;
 
-  /* ==========  Events  ========== */
-  event StakingRewardsAdded(StakingTokenType tokenType, address stakingToken, address stakingRewards);
+/* ==========  Events  ========== */
 
-  /* ==========  Structs  ========== */
+  event UniswapStakingRewardsAdded(
+    address indexPool,
+    address stakingToken,
+    address stakingRewards
+  );
+
+  event IndexPoolStakingRewardsAdded(
+    address stakingToken,
+    address stakingRewards
+  );
+
+/* ==========  Structs  ========== */
+
   enum StakingTokenType { NDX_POOL, NDX_POOL_UNISWAP_PAIR }
 
   struct StakingRewardsInfo {
@@ -74,28 +91,28 @@ contract StakingRewardsFactory is Owned {
     uint88 rewardAmount;
   }
 
-  /* ==========  Storage  ========== */
+/* ==========  Storage  ========== */
 
   /**
-   * @dev The staking tokens for which the rewards contract has been deployed.
+   * @dev The staking tokens for which a rewards contract has been deployed.
    */
-  address[] public stakingTokens;
+  address[] public override stakingTokens;
 
   /**
    * @dev Rewards info by staking token.
    */
   mapping(address => StakingRewardsInfo) public stakingRewardsInfoByStakingToken;
 
-  /* ==========  Constructor  ========== */
+/* ==========  Constructor  ========== */
+
   constructor(
-    address owner_,
     address rewardsToken_,
     uint256 stakingRewardsGenesis_,
     address proxyManager_,
     address poolFactory_,
     address uniswapFactory_,
     address weth_
-  ) public Owned(owner_) {
+  ) public Ownable() {
     rewardsToken = rewardsToken_;
     require(
       stakingRewardsGenesis_ >= block.timestamp,
@@ -108,7 +125,7 @@ contract StakingRewardsFactory is Owned {
     weth = weth_;
   }
 
-  /* ==========  Pool Deployment  ==========  */
+/* ==========  Pool Deployment  ==========  */
   // Pool deployment functions are permissioned.
 
   /**
@@ -119,7 +136,9 @@ contract StakingRewardsFactory is Owned {
    */
   function deployStakingRewardsForPool(address indexPool, uint88 rewardAmount)
     external
-    _owner_
+    override
+    onlyOwner
+    returns (address)
   {
 
     StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[indexPool];
@@ -141,7 +160,8 @@ contract StakingRewardsFactory is Owned {
     info.rewardAmount = rewardAmount;
     info.tokenType = StakingTokenType.NDX_POOL;
     stakingTokens.push(indexPool);
-    emit StakingRewardsAdded(StakingTokenType.NDX_POOL, indexPool, stakingRewards);
+    emit IndexPoolStakingRewardsAdded(indexPool, stakingRewards);
+    return stakingRewards;
   }
 
   /**
@@ -155,7 +175,11 @@ contract StakingRewardsFactory is Owned {
   function deployStakingRewardsForPoolUniswapPair(
     address indexPool,
     uint88 rewardAmount
-  ) external _owner_ {
+  )
+    external
+    override
+    onlyOwner
+  {
     require(
       poolFactory.isIPool(indexPool),
       "StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Not an index pool."
@@ -184,12 +208,12 @@ contract StakingRewardsFactory is Owned {
     info.rewardAmount = rewardAmount;
     info.tokenType = StakingTokenType.NDX_POOL_UNISWAP_PAIR;
     stakingTokens.push(pairAddress);
-    emit StakingRewardsAdded(StakingTokenType.NDX_POOL_UNISWAP_PAIR, pairAddress, stakingRewards);
+    emit UniswapStakingRewardsAdded(indexPool, pairAddress, stakingRewards);
   }
 
-  /* ==========  Rewards  ========== */
+/* ==========  Rewards Distribution  ========== */
 
-  function notifyRewardAmounts() public {
+  function notifyRewardAmounts() public override {
     require(
       stakingTokens.length > 0,
       "StakingRewardsFactory::notifyRewardAmounts: called before any deploys"
@@ -199,7 +223,7 @@ contract StakingRewardsFactory is Owned {
     }
   }
 
-  function notifyRewardAmount(address stakingToken) public {
+  function notifyRewardAmount(address stakingToken) public override {
     require(
       block.timestamp >= stakingRewardsGenesis,
       "StakingRewardsFactory::notifyRewardAmount: Not ready"
@@ -223,13 +247,13 @@ contract StakingRewardsFactory is Owned {
     }
   }
 
-  /* ==========  Queries  ========== */
+/* ==========  Queries  ========== */
 
-  function getStakingTokens() external view returns (address[] memory) {
+  function getStakingTokens() external override view returns (address[] memory) {
     return stakingTokens;
   }
 
-  function getStakingRewards(address stakingToken) external view returns (address) {
+  function getStakingRewards(address stakingToken) external override view returns (address) {
     StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
     require(
       info.stakingRewards != address(0),
@@ -239,9 +263,9 @@ contract StakingRewardsFactory is Owned {
     return info.stakingRewards;
   }
 
-  function computeStakingRewardsAddress(address stakingToken) external view returns (address) {
+  function computeStakingRewardsAddress(address stakingToken) external override view returns (address) {
     bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(stakingToken));
-    return Salty.computeProxyAddressManyToOne(
+    return SaltyLib.computeProxyAddressManyToOne(
       address(proxyManager),
       address(this),
       STAKING_REWARDS_IMPLEMENTATION_ID,
