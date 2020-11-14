@@ -4,9 +4,9 @@ import "../interfaces/IPoolFactory.sol";
 
 
 contract MockPoolFactory {
-  mapping(address => bool) public isIPool;
+  mapping(address => bool) public isRecognizedPool;
 
   function addIPool(address poolAddress) public {
-    isIPool[poolAddress] = true;
+    isRecognizedPool[poolAddress] = true;
   }
 }

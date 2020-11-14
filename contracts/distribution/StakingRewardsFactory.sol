@@ -147,7 +147,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
       "StakingRewardsFactory::deployStakingRewardsForPool: Already deployed"
     );
     require(
-      poolFactory.isIPool(indexPool),
+      poolFactory.isRecognizedPool(indexPool),
       "StakingRewardsFactory::deployStakingRewardsForPool: Not an index pool."
     );
     bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(indexPool));
@@ -181,7 +181,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     onlyOwner
   {
     require(
-      poolFactory.isIPool(indexPool),
+      poolFactory.isRecognizedPool(indexPool),
       "StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Not an index pool."
     );
 
