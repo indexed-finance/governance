@@ -26,8 +26,7 @@ const stakingFixture = deployments.createFixture(async ({
   const { timestamp: now } = await provider.getBlock('latest');
   const stakingRewardsGenesis = now + 600;
 
-  const ndx = await deploy('MockERC20', 'NDX', 'NDX');
-  await ndx.getFreeTokens(deployer, expandTo18Decimals(1e7))
+  const ndx = await ethers.getContract('Ndx');
   const proxyManager = await deploy('DelegateCallProxyManager');
 
   const mockPoolFactory = await deploy('MockPoolFactory');

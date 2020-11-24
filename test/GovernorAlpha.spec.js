@@ -11,7 +11,7 @@ describe('GovernorAlpha', () => {
   let ndx, timelock, governorAlpha;
 
   beforeEach(async () => {
-    await deployments.fixture();
+    await deployments.fixture('Governance');
     ndx = await ethers.getContract('Ndx');
     timelock = await ethers.getContract('Timelock');
     governorAlpha = await ethers.getContract('GovernorAlpha');

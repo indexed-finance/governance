@@ -21,7 +21,7 @@ describe('Ndx', () => {
   let ndx;
 
   beforeEach(async () => {
-    await deployments.fixture();
+    await deployments.fixture('Governance');
     ndx = await ethers.getContract('Ndx');
     (
       [wallet, other0, other1] = await ethers.getSigners()

@@ -7,24 +7,26 @@ const { expect } = chai;
 const { ethers } = bre;
 const { provider } = ethers;
 const { expandTo18Decimals, fastForward } = require('../utils')
+const { stakingFixture } = require('./staking.fixture');
 
 describe('distribution:StakingRewardsFactory', async () => {
   let stakingToken, rewardsToken, rewards;
-  let stakingFactory, mockPoolFactory, uniswapFactory, weth;
+  let stakingFactory, mockPoolFactory, uniswapFactory, weth, proxyManager;
   let owner, signer1, signer2;
   let stakingRewards;
   const zeroAddress = `0x${'00'.repeat(20)}`;
 
   before(async () => {
     ([owner, signer1, signer2] = await ethers.getSigners());
-    await deployments.fixture('Staking');
-    const MockERC20 = await ethers.getContractFactory('MockERC20');
-    stakingToken = await MockERC20.deploy('Staking Token', 'STK');
-    rewardsToken = await ethers.getContract('Ndx');
-    mockPoolFactory = await ethers.getContract('MockPoolFactory');
-    stakingFactory = await ethers.getContract('StakingRewardsFactory', owner);
-    uniswapFactory = await ethers.getContract('UniswapV2Factory', owner);
-    weth = await ethers.getContract('weth', owner);
+    ({
+      proxyManager,
+      stakingToken,
+      rewardsToken,
+      mockPoolFactory,
+      stakingFactory,
+      uniswapFactory,
+      weth
+    } = await stakingFixture());
   });
 
   describe('Constructor & Settings', async () => {
@@ -49,7 +51,7 @@ describe('distribution:StakingRewardsFactory', async () => {
     });
 
     it('proxyManager', async () => {
-      const expected = (await deployments.get('DelegateCallProxyManager')).address;
+      const expected = proxyManager.address;
       const actual = await stakingFactory.proxyManager();
       expect(expected).to.eq(actual);
     });
@@ -61,13 +63,13 @@ describe('distribution:StakingRewardsFactory', async () => {
     });
 
     it('uniswapFactory', async () => {
-      const expected = (await deployments.get('UniswapV2Factory')).address;
+      const expected = uniswapFactory.address;
       const actual = await stakingFactory.uniswapFactory();
       expect(expected).to.eq(actual);
     });
 
     it('weth', async () => {
-      const expected = (await deployments.get('weth')).address;
+      const expected = weth.address;
       const actual = await stakingFactory.weth();
       expect(expected).to.eq(actual);
     });

@@ -10,7 +10,7 @@ describe('distribution:TreasuryVester', () => {
   let ndx, timelock
 
   beforeEach(async () => {
-    await deployments.fixture()
+    await deployments.fixture('Governance')
     ndx = await ethers.getContract('Ndx');
     timelock = await ethers.getContract('Timelock');
     [wallet] = await ethers.getSigners();
