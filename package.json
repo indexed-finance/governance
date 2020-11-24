@@ -6,6 +6,12 @@
   "repository": {
     "url": "https://github.com/indexed-finance/governance"
   },
+  "files": [
+    "contracts",
+    "artifacts",
+    "deployments/rinkeby",
+    "deployments/mainnet"
+  ],
   "scripts": {
     "build": "buidler compile",
     "coverage": "buidler coverage --network coverage --solcoverjs ./.solcover.js",
