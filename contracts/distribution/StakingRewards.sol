@@ -23,11 +23,11 @@ contract StakingRewards is
 
 /* ==========  Constants  ========== */
 
-  uint256 public constant rewardsDuration = 60 days;
+  uint256 public override rewardsDuration = 60 days;
 
 /* ==========  Immutables  ========== */
 
-  IERC20 public immutable rewardsToken;
+  IERC20 public override immutable rewardsToken;
 
 /* ========== Events ========== */
 
@@ -35,6 +35,8 @@ contract StakingRewards is
   event Staked(address indexed user, uint256 amount);
   event Withdrawn(address indexed user, uint256 amount);
   event RewardPaid(address indexed user, uint256 reward);
+  event RewardsDurationUpdated(uint256 newDuration);
+  event Recovered(address token, uint256 amount);
 
 /* ========== Modifiers ========== */
 
@@ -50,11 +52,11 @@ contract StakingRewards is
 
 /* ==========  State Variables  ========== */
 
-  IERC20 public stakingToken;
-  uint256 public periodFinish = 0;
-  uint256 public rewardRate = 0;
-  uint256 public lastUpdateTime;
-  uint256 public rewardPerTokenStored;
+  IERC20 public override stakingToken;
+  uint256 public override periodFinish = 0;
+  uint256 public override rewardRate = 0;
+  uint256 public override lastUpdateTime;
+  uint256 public override rewardPerTokenStored;
 
   mapping(address => uint256) public userRewardPerTokenPaid;
   mapping(address => uint256) public rewards;
@@ -62,7 +64,7 @@ contract StakingRewards is
   uint256 private _totalSupply;
   mapping(address => uint256) private _balances;
 
-/* ==========  Constructor  ========== */
+/* ==========  Constructor & Initializer  ========== */
 
   constructor(
     address rewardsDistribution_,
@@ -71,10 +73,13 @@ contract StakingRewards is
     rewardsToken = IERC20(rewardsToken_);
   }
 
-  function initialize(address stakingToken_) external override {
+  function initialize(address stakingToken_, uint256 rewardsDuration_) external override {
     require(address(stakingToken) == address(0), "Already initialized");
     require(address(stakingToken_) != address(0), "Can not set null staking token");
+    require(rewardsDuration_ > 0, "Can not set null rewards duration");
+
     stakingToken = IERC20(stakingToken_);
+    rewardsDuration = rewardsDuration_;
   }
 
 /* ==========  Mutative Functions  ========== */
@@ -153,6 +158,28 @@ contract StakingRewards is
     lastUpdateTime = block.timestamp;
     periodFinish = block.timestamp.add(rewardsDuration);
     emit RewardAdded(reward);
+  }
+
+  // Added to support recovering LP Rewards from other systems such as BAL to be distributed to holders
+  function recoverERC20(address tokenAddress, address recipient) external override onlyRewardsDistribution {
+    // Cannot recover the staking token or the rewards token
+    require(
+      tokenAddress != address(stakingToken) && tokenAddress != address(rewardsToken),
+      "Cannot withdraw the staking or rewards tokens"
+    );
+    uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
+    IERC20(tokenAddress).safeTransfer(recipient, balance);
+    emit Recovered(tokenAddress, balance);
+  }
+
+  function setRewardsDuration(uint256 _rewardsDuration) external override onlyRewardsDistribution {
+    require(
+      block.timestamp > periodFinish,
+      "Previous rewards period must be complete before changing the duration for the new period"
+    );
+    require(_rewardsDuration > 0, "Can not set null rewards duration.");
+    rewardsDuration = _rewardsDuration;
+    emit RewardsDurationUpdated(rewardsDuration);
   }
 
 /* ==========  Views  ========== */
