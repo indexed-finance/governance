@@ -29,29 +29,37 @@ describe('distribution:StakingRewards', async () => {
 
   describe('Initialization', async () => {
     it('does not allow null staking token', async () => {
-      await expect(rewards.initialize(zeroAddress)).to.be.rejectedWith(/Can not set null staking token/g);
+      await expect(rewards.initialize(zeroAddress, DURATION)).to.be.rejectedWith(/Can not set null staking token/g);
+    });
+
+    it('does not allow zero duration', async () => {
+      await expect(rewards.initialize(stakingToken.address, 0)).to.be.rejectedWith(/Can not set null rewards duration/g);
     });
 
     it('sets the staking token', async () => {
-      await rewards.initialize(stakingToken.address);
+      await rewards.initialize(stakingToken.address, DURATION);
     });
 
     it('can not be initialized twice', async () => {
-      await expect(rewards.initialize(stakingToken.address)).to.be.rejectedWith(/Already initialized/g);
+      await expect(rewards.initialize(stakingToken.address, DURATION)).to.be.rejectedWith(/Already initialized/g);
     });
   });
 
-  describe('Constructor & Settings', () => {
+  describe('Constructor & Initializer', () => {
 		it('should set rewards token on constructor', async () => {
       expect(await rewards.rewardsToken()).to.eq(rewardsToken.address);
+		});
+
+		it('should set rewardsDistribution on constructor', async () => {
+      expect(await rewards.rewardsDistribution()).to.eq(await owner.getAddress());
 		});
 
 		it('should set staking token on initialize', async () => {
       expect(await rewards.stakingToken()).to.eq(stakingToken.address);
 		});
 
-		it('should set rewardsDistribution on constructor', async () => {
-      expect(await rewards.rewardsDistribution()).to.eq(await owner.getAddress());
+		it('should set rewardsDuration on initialize', async () => {
+      expect((await rewards.rewardsDuration()).eq(DURATION)).to.be.true;
 		});
   });
 
@@ -314,7 +322,7 @@ describe('distribution:StakingRewards', async () => {
 		before(async () => {
       const StakingRewards = await ethers.getContractFactory('StakingRewards');
       localStakingRewards = await StakingRewards.deploy(await owner.getAddress(), rewardsToken.address);
-      await localStakingRewards.initialize(stakingToken.address);
+      await localStakingRewards.initialize(stakingToken.address, DURATION);
 		});
 
 		it('Reverts if the provided reward is greater than the balance.', async () => {
@@ -343,6 +351,140 @@ describe('distribution:StakingRewards', async () => {
       await expect(
         localStakingRewards.notifyRewardAmount(rewardValue.add(addAmount))
       ).to.be.rejectedWith(/Provided reward too high/g);
+		});
+  });
+
+  describe('recoverERC20', async () => {
+    let recoveryToken, target;
+
+    before(async () => {
+      target = await stakingAccount1.getAddress();
+      const MockERC20 = await ethers.getContractFactory('MockERC20');
+      recoveryToken = await MockERC20.deploy('Recovery Token', 'RCT');
+    });
+
+    it('Reverts if not called by owner', async () => {
+      await expect(
+        rewards.connect(stakingAccount1).recoverERC20(recoveryToken.address, target)
+      ).to.be.rejectedWith(/Caller is not RewardsDistribution contract/g);
+    });
+
+    it('Reverts if token is rewards or staking token', async () => {
+      await expect(
+        rewards.recoverERC20(stakingToken.address, target)
+      ).to.be.rejectedWith(/Cannot withdraw the staking or rewards tokens/g);
+      await expect(
+        rewards.recoverERC20(rewardsToken.address, target)
+      ).to.be.rejectedWith(/Cannot withdraw the staking or rewards tokens/g);
+    });
+
+    it('Recovers tokens', async () => {
+      await recoveryToken.getFreeTokens(rewards.address, expandTo18Decimals(1000));
+      await rewards.recoverERC20(recoveryToken.address, target);
+      const balance = await recoveryToken.balanceOf(target);
+      expect(balance.eq(expandTo18Decimals(1000))).to.be.true;
+    });
+  });
+  
+  describe('setRewardsDuration()', () => {
+    let localStakingRewards;
+    let nonOwnerLocalStakingRewards;
+    let nonOwnerStakingToken;
+
+		const sevenDays = DAY * 7;
+		const seventyDays = DAY * 70;
+
+		beforeEach(async () => {
+      const StakingRewards = await ethers.getContractFactory('StakingRewards');
+      localStakingRewards = await StakingRewards.deploy(await owner.getAddress(), rewardsToken.address);
+      await localStakingRewards.initialize(stakingToken.address, sevenDays);
+      nonOwnerLocalStakingRewards = localStakingRewards.connect(stakingAccount1);
+      nonOwnerStakingToken = stakingToken.connect(stakingAccount1);
+    });
+
+    it('should revert if not called by owner', async () => {
+      await expect(
+        nonOwnerLocalStakingRewards.setRewardsDuration(0)
+      ).to.be.rejectedWith(/Caller is not RewardsDistribution contract/g);
+    })
+
+		it('should increase rewards duration before starting distribution', async () => {
+			const oldDuration = await localStakingRewards.rewardsDuration();
+			expect(oldDuration.eq(sevenDays)).to.be.true;
+
+			await localStakingRewards.setRewardsDuration(seventyDays);
+			const newDuration = await localStakingRewards.rewardsDuration();
+			expect(newDuration.eq(seventyDays)).to.be.true;
+		});
+
+    it('should revert when setting setRewardsDuration before the period has finished', async () => {
+			const totalToStake = expandTo18Decimals(100);
+      const totalToDistribute = expandTo18Decimals(5000);
+ 
+
+      await stakingToken.getFreeTokens(await stakingAccount1.getAddress(), totalToStake)
+			await nonOwnerStakingToken.approve(localStakingRewards.address, totalToStake);
+			await nonOwnerLocalStakingRewards.stake(totalToStake);
+
+			await rewardsToken.getFreeTokens(localStakingRewards.address, totalToDistribute);
+			await localStakingRewards.notifyRewardAmount(totalToDistribute);
+
+      await fastForward(provider, DAY);
+
+      await expect(
+        localStakingRewards.setRewardsDuration(seventyDays)
+      ).to.be.rejectedWith(/Previous rewards period must be complete before changing the duration for the new period/g);
+    });
+
+		it('should update when setting setRewardsDuration after the period has finished', async () => {
+			const totalToStake = expandTo18Decimals(100);
+      const totalToDistribute = expandTo18Decimals(5000);
+
+			await stakingToken.getFreeTokens(await stakingAccount1.getAddress(), totalToStake);
+			await nonOwnerStakingToken.approve(localStakingRewards.address, totalToStake);
+			await nonOwnerLocalStakingRewards.stake(totalToStake);
+
+			await rewardsToken.getFreeTokens(localStakingRewards.address, totalToDistribute);
+			await localStakingRewards.notifyRewardAmount(totalToDistribute);
+
+			await fastForward(provider, DAY * 80);
+
+      const { events } = await localStakingRewards.setRewardsDuration(sevenDays).then(tx => tx.wait());
+      expect(events.find(e => e.event == 'RewardsDurationUpdated').args.newDuration.eq(sevenDays)).to.be.true;
+
+      const newDuration = await localStakingRewards.rewardsDuration();
+      expect(newDuration.eq(sevenDays)).to.be.true;
+
+			await localStakingRewards.notifyRewardAmount(totalToDistribute);
+		});
+
+		it('should update when setting setRewardsDuration after the period has finished', async () => {
+			const totalToStake = expandTo18Decimals(100);
+      const totalToDistribute = expandTo18Decimals(5000);
+
+			await stakingToken.getFreeTokens(await stakingAccount1.getAddress(), totalToStake);
+			await nonOwnerStakingToken.approve(localStakingRewards.address, totalToStake);
+			await nonOwnerLocalStakingRewards.stake(totalToStake);
+
+			await rewardsToken.getFreeTokens(localStakingRewards.address, totalToDistribute);
+			await localStakingRewards.notifyRewardAmount(totalToDistribute);
+
+			await fastForward(provider, DAY * 4);
+			await nonOwnerLocalStakingRewards.getReward();
+			await fastForward(provider, DAY * 4);
+
+			// New Rewards period much lower
+			await rewardsToken.getFreeTokens(localStakingRewards.address, totalToDistribute);
+      const { events } = await localStakingRewards.setRewardsDuration(seventyDays).then(tx => tx.wait());
+      expect(events.find(e => e.event == 'RewardsDurationUpdated').args.newDuration.eq(seventyDays)).to.be.true;
+
+			const newDuration = await localStakingRewards.rewardsDuration();
+      expect(newDuration.eq(seventyDays)).to.be.true;
+
+			await localStakingRewards.notifyRewardAmount(totalToDistribute);
+
+			await fastForward(provider, DAY * 71);
+			await nonOwnerLocalStakingRewards.getReward();
 		});
 	});
 });
