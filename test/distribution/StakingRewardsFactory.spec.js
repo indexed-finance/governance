@@ -1,6 +1,6 @@
 const bre = require("@nomiclabs/buidler");
 const chai = require('chai');
-const { keccak256 } = require("ethers/lib/utils");
+const { keccak256, formatEther } = require("ethers/lib/utils");
 
 chai.use(require('chai-as-promised'));
 const { expect } = chai;
@@ -8,6 +8,8 @@ const { ethers } = bre;
 const { provider } = ethers;
 const { expandTo18Decimals, fastForward } = require('../utils')
 const { stakingFixture } = require('./staking.fixture');
+
+const DURATION = 60 * 24 * 60 * 60;
 
 describe('distribution:StakingRewardsFactory', async () => {
   let stakingToken, rewardsToken, rewards;
@@ -118,8 +120,8 @@ describe('distribution:StakingRewardsFactory', async () => {
 
     it('Notifies all the pools of their rewards', async () => {
       const rewardValue = expandTo18Decimals(100);
-      await factory.deployStakingRewardsForPool(token1.address, rewardValue).then(tx => tx.wait());
-      await factory.deployStakingRewardsForPool(token2.address, rewardValue).then(tx => tx.wait());
+      await factory.deployStakingRewardsForPool(token1.address, rewardValue, DURATION).then(tx => tx.wait());
+      await factory.deployStakingRewardsForPool(token2.address, rewardValue, DURATION).then(tx => tx.wait());
       expect((await factory.stakingRewardsInfoByStakingToken(token1.address)).rewardAmount.eq(rewardValue)).to.be.true;
       expect((await factory.stakingRewardsInfoByStakingToken(token2.address)).rewardAmount.eq(rewardValue)).to.be.true;
       await factory.notifyRewardAmounts();
@@ -130,7 +132,7 @@ describe('distribution:StakingRewardsFactory', async () => {
 
   describe('getStakingRewards()', async () => {
     it('Reverts if the staking token provided does not have a rewards pool', async () => {
-      await expect(stakingFactory.getStakingRewards(zeroAddress)).to.be.rejectedWith(/StakingRewardsFactory::getStakingRewards: Not deployed/g);
+      await expect(stakingFactory.getStakingRewards(zeroAddress)).to.be.rejectedWith(/StakingRewardsFactory::_getRewards: Not deployed/g);
     });
   });
 
@@ -138,24 +140,24 @@ describe('distribution:StakingRewardsFactory', async () => {
     it('Only allows owner to call deployStakingRewardsForPool', async () => {
       const rewardValue = expandTo18Decimals(100);
       await expect(
-        stakingFactory.connect(signer1).deployStakingRewardsForPool(zeroAddress, rewardValue)
+        stakingFactory.connect(signer1).deployStakingRewardsForPool(zeroAddress, rewardValue, DURATION)
       ).to.be.rejectedWith(/Ownable: caller is not the owner/g);
     });
 
     it('Reverts if the staking token is not an index lp token', async () => {
       const rewardValue = expandTo18Decimals(100);
       await expect(
-        stakingFactory.deployStakingRewardsForPool(zeroAddress, rewardValue)
+        stakingFactory.deployStakingRewardsForPool(zeroAddress, rewardValue, DURATION)
       ).to.be.rejectedWith(/StakingRewardsFactory::deployStakingRewardsForPool: Not an index pool/g);
     });
 
     it('Allows the owner to deploy a staking pool for an index lp token', async () => {
       await mockPoolFactory.addIPool(stakingToken.address);
       const rewardValue = expandTo18Decimals(100);
-      const retAddr = await stakingFactory.callStatic.deployStakingRewardsForPool(stakingToken.address, rewardValue);
+      const retAddr = await stakingFactory.callStatic.deployStakingRewardsForPool(stakingToken.address, rewardValue, DURATION);
       console.log(`Returned address ${retAddr}`);
 
-      const {events} = await stakingFactory.deployStakingRewardsForPool(stakingToken.address, rewardValue).then(tx => tx.wait());
+      const {events} = await stakingFactory.deployStakingRewardsForPool(stakingToken.address, rewardValue, DURATION).then(tx => tx.wait());
       const { args } = events.filter(e => e.event == 'IndexPoolStakingRewardsAdded')[0];
       expect(args.stakingToken).to.eq(stakingToken.address);
       stakingRewards = args.stakingRewards;
@@ -165,7 +167,7 @@ describe('distribution:StakingRewardsFactory', async () => {
     it('Fails duplicate deployment without calling proxy manager', async () => {
       const rewardValue = expandTo18Decimals(100);
       await expect(
-        stakingFactory.deployStakingRewardsForPool(stakingToken.address, rewardValue)
+        stakingFactory.deployStakingRewardsForPool(stakingToken.address, rewardValue, DURATION)
       ).to.be.rejectedWith(/StakingRewardsFactory::deployStakingRewardsForPool: Already deployed/g);
     });
 
@@ -232,7 +234,7 @@ describe('distribution:StakingRewardsFactory', async () => {
         await rewardsToken.transfer(stakingFactory.address, rewardValue);
         await expect(
           stakingFactory.notifyRewardAmount(zeroAddress)
-        ).to.be.rejectedWith(/StakingRewardsFactory::notifyRewardAmount: Not deployed/g);
+        ).to.be.rejectedWith(/StakingRewardsFactory::_getRewards: Not deployed/g);
       });
   
       it('Notifies the pool of its rewards if there are pending rewards', async () => {
@@ -256,6 +258,56 @@ describe('distribution:StakingRewardsFactory', async () => {
         expect(initialRate.eq(rateAfter)).to.be.true;
       });
     });
+    
+    describe('setRewardsDuration()', async () => {
+      it('Reverts if not called by owner', async () => {
+        await expect(
+          stakingFactory.connect(signer1).setRewardsDuration(stakingToken.address, DURATION / 2)
+        ).to.be.rejectedWith(/Ownable: caller is not the owner/g);
+      });
+
+      it('Reverts if stakingToken has no pool', async () => {
+        await expect(
+          stakingFactory.setRewardsDuration(zeroAddress, DURATION / 2)
+        ).to.be.rejectedWith(/StakingRewardsFactory::_getRewards: Not deployed/g);
+      });
+
+      it('Updates the duration', async () => {
+        await fastForward(provider, DURATION);
+        const rewards = await ethers.getContractAt('IStakingRewards', stakingRewards);
+        const duration = await rewards.rewardsDuration();
+        expect(duration.eq(DURATION)).to.be.true;
+        await stakingFactory.setRewardsDuration(stakingToken.address, DURATION / 2);
+        const newDuration = await rewards.rewardsDuration();
+        expect(newDuration.eq(DURATION / 2)).to.be.true;
+      });
+    });
+  });
+
+  describe('recoverERC20()', async () => {
+    let recoveryToken, target;
+
+    before(async () => {
+      target = await owner.getAddress();
+      const MockERC20 = await ethers.getContractFactory('MockERC20');
+      recoveryToken = await MockERC20.deploy('Recovery Token', 'RCT');
+    });
+
+    it('Reverts if token is rewards or staking token', async () => {
+      await expect(
+        stakingFactory.recoverERC20(stakingToken.address, stakingToken.address)
+      ).to.be.rejectedWith(/Cannot withdraw the staking or rewards tokens/g);
+      await expect(
+        stakingFactory.recoverERC20(stakingToken.address, rewardsToken.address)
+      ).to.be.rejectedWith(/Cannot withdraw the staking or rewards tokens/g);
+    });
+
+    it('Recovers tokens', async () => {
+      await recoveryToken.getFreeTokens(stakingRewards, expandTo18Decimals(1000));
+      await stakingFactory.recoverERC20(stakingToken.address, recoveryToken.address);
+      const balance = await recoveryToken.balanceOf(target);
+      expect(balance.eq(expandTo18Decimals(1000))).to.be.true;
+    });
   });
 
   describe('deployStakingRewardsForPoolUniswapPair', async () => {
@@ -269,20 +321,20 @@ describe('distribution:StakingRewardsFactory', async () => {
     it('Only allows owner to call deployStakingRewardsForPoolUniswapPair', async () => {
       const rewardValue = expandTo18Decimals(100);
       await expect(
-        stakingFactory.connect(signer1).deployStakingRewardsForPoolUniswapPair(zeroAddress, rewardValue)
+        stakingFactory.connect(signer1).deployStakingRewardsForPoolUniswapPair(zeroAddress, rewardValue, DURATION)
       ).to.be.rejectedWith(/Ownable: caller is not the owner/g);
     });
 
     it('Reverts if the staking token is not an index lp token', async () => {
       const rewardValue = expandTo18Decimals(100);
       await expect(
-        stakingFactory.deployStakingRewardsForPoolUniswapPair(zeroAddress, rewardValue)
+        stakingFactory.deployStakingRewardsForPoolUniswapPair(zeroAddress, rewardValue, DURATION)
       ).to.be.rejectedWith(/StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Not an index pool/g);
     });
 
     it('Allows the owner to deploy a staking pool for an index lp token <-> weth uniswap pair', async () => {
       const rewardValue = expandTo18Decimals(100);
-      const {events} = await stakingFactory.deployStakingRewardsForPoolUniswapPair(stakingToken.address, rewardValue).then(tx => tx.wait());
+      const {events} = await stakingFactory.deployStakingRewardsForPoolUniswapPair(stakingToken.address, rewardValue, DURATION).then(tx => tx.wait());
       const { args } = events.filter(e => e.event == 'UniswapStakingRewardsAdded')[0];
       expect(args.stakingToken).to.eq(pairAddress);
       expect(args.indexPool).to.eq(stakingToken.address);
@@ -292,7 +344,7 @@ describe('distribution:StakingRewardsFactory', async () => {
     it('Fails duplicate deployment without calling proxy manager', async () => {
       const rewardValue = expandTo18Decimals(100);
       await expect(
-        stakingFactory.deployStakingRewardsForPoolUniswapPair(stakingToken.address, rewardValue)
+        stakingFactory.deployStakingRewardsForPoolUniswapPair(stakingToken.address, rewardValue, DURATION)
       ).to.be.rejectedWith(/StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Already deployed/g);
     });
 
@@ -353,7 +405,7 @@ describe('distribution:StakingRewardsFactory', async () => {
         await rewardsToken.transfer(stakingFactory.address, rewardValue);
         await expect(
           stakingFactory.notifyRewardAmount(zeroAddress)
-        ).to.be.rejectedWith(/StakingRewardsFactory::notifyRewardAmount: Not deployed/g);
+        ).to.be.rejectedWith(/StakingRewardsFactory::_getRewards: Not deployed/g);
       });
   
       it('Notifies the pool of its rewards if there are pending rewards', async () => {
@@ -376,6 +428,64 @@ describe('distribution:StakingRewardsFactory', async () => {
         const rateAfter = await stakingPool.rewardRate();
         expect(initialRate.eq(rateAfter)).to.be.true;
       });
+    });
+  });
+
+  describe('increaseStakingRewards', async () => {
+    let token, pool, rewardValue, factory;
+    before(async () => {
+      const MockERC20 = await ethers.getContractFactory('MockERC20');
+      token = await MockERC20.deploy('Staking Token', 'STK');
+      await mockPoolFactory.addIPool(token.address);
+
+      rewardValue = expandTo18Decimals(100);
+      await rewardsToken.transfer(stakingFactory.address, rewardValue);
+      const {events} = await stakingFactory.deployStakingRewardsForPool(token.address, rewardValue, DURATION).then(tx => tx.wait());
+      const { args } = events.filter(e => e.event == 'IndexPoolStakingRewardsAdded')[0];
+      pool = args.stakingRewards;
+    });
+
+    it('Can only be called by owner', async () => {
+      await expect(
+        stakingFactory.connect(signer1).increaseStakingRewards(token.address, 1)
+      ).to.be.rejectedWith(/Ownable: caller is not the owner/g);
+
+    })
+
+    it('Reverts if amount is zero', async () => {
+      await expect(
+        stakingFactory.increaseStakingRewards(zeroAddress, 0)
+      ).to.be.rejectedWith(/StakingRewardsFactory::increaseStakingRewards: Can not add 0 rewards\./g);
+    });
+
+    it('Reverts if pool does not exist', async () => {
+      await expect(
+        stakingFactory.increaseStakingRewards(zeroAddress, 1)
+      ).to.be.rejectedWith(/StakingRewardsFactory::_getRewards: Not deployed/g);
+    });
+
+    it('Reverts if pool has pending rewards', async () => {
+      await expect(
+        stakingFactory.increaseStakingRewards(token.address, rewardValue)
+      ).to.be.rejectedWith(/StakingRewardsFactory::increaseStakingRewards: Can not add rewards while pool still has pending rewards\./g);
+      await token.getFreeTokens(stakingFactory.address, rewardValue);
+    });
+
+    it('Reverts if pool is still active', async () => {
+      await stakingFactory.notifyRewardAmount(token.address);
+      await expect(
+        stakingFactory.increaseStakingRewards(token.address, rewardValue)
+      ).to.be.rejectedWith(/StakingRewardsFactory::increaseStakingRewards: Previous rewards period must be complete to add rewards\./g)
+    });
+
+    it('Succeeds when the pool is finished', async () => {
+      const poolContract = await ethers.getContractAt('IStakingRewards', pool);
+      const rewardRate = await poolContract.rewardRate();
+      await fastForward(provider, DURATION);
+      await rewardsToken.transfer(stakingFactory.address, rewardValue.mul(2));
+      await stakingFactory.increaseStakingRewards(token.address, rewardValue.mul(2));
+      const rewardRate2 = await poolContract.rewardRate();
+      expect(rewardRate2.eq(rewardRate.mul(2))).to.be.true;
     });
   });
 });
