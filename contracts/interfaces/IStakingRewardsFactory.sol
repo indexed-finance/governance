@@ -32,18 +32,25 @@ interface IStakingRewardsFactory {
 
   function stakingTokens(uint256) external view returns (address);
 
-  /* ==========  Pool Deployment  ==========  */
-  // Pool deployment functions are permissioned.
+/* ==========  Pool Deployment (Permissioned)  ==========  */
 
-  function deployStakingRewardsForPool(address indexPool, uint88 rewardAmount) external returns (address);
+  function deployStakingRewardsForPool(address indexPool, uint88 rewardAmount, uint256 rewardsDuration) external returns (address);
 
-  function deployStakingRewardsForPoolUniswapPair(address indexPool, uint88 rewardAmount) external;
+  function deployStakingRewardsForPoolUniswapPair(address indexPool, uint88 rewardAmount, uint256 rewardsDuration) external;
 
 /* ==========  Rewards  ========== */
 
   function notifyRewardAmounts() external;
 
   function notifyRewardAmount(address stakingToken) external;
+
+  function increaseStakingRewards(address stakingToken, uint88 rewardAmount) external;
+
+  function setRewardsDuration(address stakingToken, uint256 newDuration) external;
+
+/* ==========  Token Recovery  ========== */
+
+  function recoverERC20(address stakingToken, address tokenAddress) external;
 
 /* ==========  Queries  ========== */
 
