@@ -2,13 +2,14 @@ const bre = require('@nomiclabs/buidler');
 const { keccak256 } = require('ethers/lib/utils');
 const { expandTo18Decimals } = require('../utils');
 const {deployments} = bre;
+const governanceFixture = require('../governance.fixture');
 
 const stakingFixture = deployments.createFixture(async ({
   deployments,
   getNamedAccounts,
   ethers,
 }) => {
-  await deployments.fixture('Governance');
+  await deployments.createFixture(governanceFixture)();
   const { deployer } = await getNamedAccounts();
   const [ signer ] = await ethers.getSigners();
   const { provider } = ethers;

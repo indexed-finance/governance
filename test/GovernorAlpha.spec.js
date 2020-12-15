@@ -5,13 +5,15 @@ const { deployments, ethers } = bre;
 
 const { DELAY, fastForward } = require('./utils');
 
+const governanceFixture = require('./governance.fixture');
+
 describe('GovernorAlpha', () => {
   let wallet, address;
 
   let ndx, timelock, governorAlpha;
 
   beforeEach(async () => {
-    await deployments.fixture('Governance');
+    await deployments.createFixture(governanceFixture)();
     ndx = await ethers.getContract('Ndx');
     timelock = await ethers.getContract('Timelock');
     governorAlpha = await ethers.getContract('GovernorAlpha');

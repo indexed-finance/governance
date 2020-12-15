@@ -3,6 +3,7 @@ const { expect } = require('chai')
 const { deployments, ethers } = bre;
 const { provider } = ethers;
 
+const governanceFixture = require('../governance.fixture');
 const { mineBlock, expandTo18Decimals } = require('../utils')
 
 describe('distribution:DelegatingVester', () => {
@@ -10,7 +11,7 @@ describe('distribution:DelegatingVester', () => {
   let owner, newOwner;
 
   beforeEach(async () => {
-    await deployments.fixture('Governance')
+    await deployments.createFixture(governanceFixture)();
     ndx = await ethers.getContract('Ndx');
     [deployer, owner, newOwner] = await ethers.getSigners()
       .then(async (signers) => Promise.all(

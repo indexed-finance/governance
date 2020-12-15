@@ -3,6 +3,7 @@ const { expect } = require('chai')
 const { deployments, ethers } = bre;
 const { provider } = ethers;
 
+const governanceFixture = require('../governance.fixture');
 const { mineBlock, expandTo18Decimals } = require('../utils')
 
 describe('distribution:TreasuryVester', () => {
@@ -10,7 +11,7 @@ describe('distribution:TreasuryVester', () => {
   let ndx, timelock
 
   beforeEach(async () => {
-    await deployments.fixture('Governance')
+    await deployments.createFixture(governanceFixture)();
     ndx = await ethers.getContract('Ndx');
     timelock = await ethers.getContract('Timelock');
     [wallet] = await ethers.getSigners();
