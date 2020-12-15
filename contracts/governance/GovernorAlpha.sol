@@ -47,12 +47,12 @@ contract GovernorAlpha {
   /**
    * @dev The address of the Indexed Protocol Timelock
    */
-  ITimelock public timelock;
+  ITimelock public immutable timelock;
 
   /**
    * @dev The address of the Indexed governance token
    */
-  NdxInterface public ndx;
+  NdxInterface public immutable ndx;
 
   /**
    * @dev The total number of proposals
