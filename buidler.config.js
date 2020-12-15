@@ -13,7 +13,6 @@ usePlugin('@nomiclabs/buidler-waffle');
 usePlugin('@nomiclabs/buidler-etherscan');
 usePlugin('buidler-ethers-v5');
 usePlugin('buidler-deploy');
-usePlugin('buidler-abi-exporter');
 usePlugin('solidity-coverage');
 
 const keys = {
