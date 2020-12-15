@@ -1,13 +1,5 @@
 pragma solidity ^0.6.0;
 
-/* ---  External Interfaces  --- */
-import "@indexed-finance/proxies/contracts/interfaces/IDelegateCallProxyManager.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-/* ---  Internal Interfaces  --- */
-import "../interfaces/IPoolFactory.sol";
-import "../interfaces/IStakingRewards.sol";
-
 
 interface IStakingRewardsFactory {
 /* ==========  Constants  ========== */
@@ -16,9 +8,9 @@ interface IStakingRewardsFactory {
 
 /* ==========  Immutables  ========== */
 
-  function poolFactory() external view returns (IPoolFactory);
+  function poolFactory() external view returns (address);
 
-  function proxyManager() external view returns (IDelegateCallProxyManager);
+  function proxyManager() external view returns (address);
 
   function rewardsToken() external view returns (address);
 
