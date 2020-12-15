@@ -1,10 +1,12 @@
-const { expect } = require('chai')
-const { constants, utils } = require('ethers')
+const chai = require('chai')
+const { constants, utils, BigNumber } = require('ethers')
 const bre = require("@nomiclabs/buidler");
 const { deployments, ethers } = bre;
 const { ecsign } = require('ethereumjs-util')
+chai.use(require('chai-as-promised'));
 
-const { expandTo18Decimals, getWallets } = require('./utils')
+const { expect } = chai;
+const { expandTo18Decimals, getWallets, DELAY, fastForward } = require('./utils')
 
 const DOMAIN_TYPEHASH = utils.keccak256(
   utils.toUtf8Bytes('EIP712Domain(string name,uint256 chainId,address verifyingContract)')
@@ -17,12 +19,11 @@ const PERMIT_TYPEHASH = utils.keccak256(
 describe('Ndx', () => {
   let wallet, other0, other1;
   let wallet1;
+  let mintingAllowedAfter;
 
   let ndx;
 
-  beforeEach(async () => {
-    await deployments.fixture('Governance');
-    ndx = await ethers.getContract('Ndx');
+  beforeEach(async () => {    
     (
       [wallet, other0, other1] = await ethers.getSigners()
         .then(async (signers) => Promise.all(
@@ -30,6 +31,10 @@ describe('Ndx', () => {
         )
     );
     [wallet1] = await getWallets(ethers, 1);
+    const Ndx = await ethers.getContractFactory('Ndx');
+    const { timestamp } = await ethers.provider.getBlock('latest');
+    mintingAllowedAfter = timestamp + DELAY;
+    ndx = await Ndx.deploy(wallet.address, wallet.address, mintingAllowedAfter);
   });
 
   describe('Constructor & Settings', async () => {
@@ -44,9 +49,17 @@ describe('Ndx', () => {
       const expected = expandTo18Decimals(1e7);
       expect(actual.eq(expected)).to.be.true;
     });
+
+    it('Set the minter as the governor contract', async () => {
+      expect(await ndx.minter()).to.eq(wallet.address);
+    });
+
+    it('Sets the mint timestamp', async () => {
+      expect((await ndx.mintingAllowedAfter()).eq(mintingAllowedAfter)).to.be.true;
+    });
   });
 
-  it('permit', async () => {
+  it('permit()', async () => {
     const chainID = bre.network.name == 'coverage' ? 1 : +(await getChainId());
     const domainSeparator = utils.keccak256(
       utils.defaultAbiCoder.encode(
@@ -106,4 +119,70 @@ describe('Ndx', () => {
     currectVotes1 = await ndx.getCurrentVotes(other1.address)
     expect(currectVotes1.eq(expandTo18Decimals(1))).to.be.true;
   });
+
+
+  describe('setMinter()', async () => {
+    it('reverts if not called by owner', async () => {
+      await expect(
+        ndx.connect(other1).setMinter(`0x${'00'.repeat(20)}`)
+      ).to.be.rejectedWith(/Ndx::setMinter: only the minter can change the minter address/g)
+    });
+
+    it('sets the minter', async () => {
+      await ndx.setMinter(other1.address);
+      expect(await ndx.minter()).to.eq(other1.address);
+      await ndx.connect(other1).setMinter(wallet.address);
+      expect(await ndx.minter()).to.eq(wallet.address);
+    });
+  });
+
+  describe('mint()', async () => {
+    it('reverts if not called by owner', async () => {
+      await expect(
+        ndx.connect(other1).mint(`0x${'00'.repeat(20)}`, 0)
+      ).to.be.rejectedWith(/Ndx::mint: only the minter can mint/g);
+    });
+
+    it('reverts if called before mintingAllowedAfter', async () => {
+      await expect(
+        ndx.mint(`0x${'00'.repeat(20)}`, 0)
+      ).to.be.rejectedWith(/Ndx::mint: minting not allowed yet/g);
+    });
+  
+    it('reverts if target is null address', async () => {
+      await fastForward(ethers.provider, DELAY);
+      await expect(
+        ndx.mint(`0x${'00'.repeat(20)}`, 0)
+      ).to.be.rejectedWith(/Ndx::mint: cannot transfer to the zero address/g);
+    });
+
+    it('reverts if amount exceeds 96 bits', async () => {
+      await fastForward(ethers.provider, DELAY);
+      const maxAmount = BigNumber.from(2).pow(96);
+      await expect(
+        ndx.mint(`0x${'ff'.repeat(20)}`, maxAmount)
+      ).to.be.rejectedWith(/Ndx::mint: amount exceeds 96 bits/g);
+    });
+
+    it('reverts if amount exceeds 10% supply', async () => {
+      await fastForward(ethers.provider, DELAY);
+      const amount = BigNumber.from(10).pow(25).add(1);
+      await expect(
+        ndx.mint(`0x${'ff'.repeat(20)}`, amount)
+      ).to.be.rejectedWith(/Ndx::mint: exceeded mint cap/g);
+    });
+  
+    it('mints tokens to target', async () => {
+      await fastForward(ethers.provider, DELAY);
+      const tx = await ndx.mint(other1.address, expandTo18Decimals(1));
+      const { blockNumber } = await tx.wait();
+      const { timestamp } = await ethers.provider.getBlock(blockNumber);
+      const ninetyDays = 90 * 24 * 3600;
+      expect((await ndx.balanceOf(other1.address)).eq(expandTo18Decimals(1))).to.be.true;
+      expect((await ndx.mintingAllowedAfter()).eq(timestamp + ninetyDays)).to.be.true;
+      expect(await ndx.totalSupply()).to.eq(expandTo18Decimals(10000001))
+    });
+  });
+
+  // it('adds ')
 });
