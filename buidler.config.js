@@ -49,7 +49,8 @@ module.exports = {
         "node_modules/@indexed-finance/uniswap-deployments/rinkeby"
       ],
       mainnet: [
-        "node_modules/@indexed-finance/uniswap-deployments/rinkeby"
+        "node_modules/@indexed-finance/proxies/deployments/mainnet",
+        "node_modules/@indexed-finance/uniswap-deployments/mainnet"
       ]
     }
   },
