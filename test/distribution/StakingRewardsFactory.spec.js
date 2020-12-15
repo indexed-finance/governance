@@ -273,7 +273,7 @@ describe('distribution:StakingRewardsFactory', async () => {
       });
 
       it('Updates the duration', async () => {
-        await fastForward(provider, DURATION);
+        await fastForward(provider, DURATION + 1);
         const rewards = await ethers.getContractAt('IStakingRewards', stakingRewards);
         const duration = await rewards.rewardsDuration();
         expect(duration.eq(DURATION)).to.be.true;
@@ -449,7 +449,6 @@ describe('distribution:StakingRewardsFactory', async () => {
       await expect(
         stakingFactory.connect(signer1).increaseStakingRewards(token.address, 1)
       ).to.be.rejectedWith(/Ownable: caller is not the owner/g);
-
     })
 
     it('Reverts if amount is zero', async () => {
@@ -478,10 +477,16 @@ describe('distribution:StakingRewardsFactory', async () => {
       ).to.be.rejectedWith(/StakingRewardsFactory::increaseStakingRewards: Previous rewards period must be complete to add rewards\./g)
     });
 
+    it('Reverts if factory has insufficient balance', async () => {
+      await fastForward(provider, DURATION);
+      await expect(
+        stakingFactory.increaseStakingRewards(token.address, expandTo18Decimals(1e5))
+      ).to.be.rejectedWith(/Ndx::_transferTokens: transfer amount exceeds balance/g);
+    });
+
     it('Succeeds when the pool is finished', async () => {
       const poolContract = await ethers.getContractAt('IStakingRewards', pool);
       const rewardRate = await poolContract.rewardRate();
-      await fastForward(provider, DURATION);
       await rewardsToken.transfer(stakingFactory.address, rewardValue.mul(2));
       await stakingFactory.increaseStakingRewards(token.address, rewardValue.mul(2));
       const rewardRate2 = await poolContract.rewardRate();
