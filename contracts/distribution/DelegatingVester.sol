@@ -5,6 +5,9 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 
 
 contract DelegatingVester {
+  /// @dev The name of this contract
+  string public constant name = "Indexed Team Vesting Contract";
+
   using SafeMath for uint256;
 
   address public immutable ndx;
