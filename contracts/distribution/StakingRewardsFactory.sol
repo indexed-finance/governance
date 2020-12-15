@@ -125,8 +125,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     weth = weth_;
   }
 
-/* ==========  Pool Deployment  ==========  */
-  // Pool deployment functions are permissioned.
+/* ==========  Pool Deployment (Permissioned)  ========== */
 
   /**
    * @dev Deploys a staking pool for the LP token of an index pool.
@@ -134,7 +133,11 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
    * Verifies that the staking token is the address of a pool deployed by the
    * Indexed pool factory.
    */
-  function deployStakingRewardsForPool(address indexPool, uint88 rewardAmount)
+  function deployStakingRewardsForPool(
+    address indexPool,
+    uint88 rewardAmount,
+    uint256 rewardsDuration
+  )
     external
     override
     onlyOwner
@@ -155,7 +158,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
       STAKING_REWARDS_IMPLEMENTATION_ID,
       stakingRewardsSalt
     );
-    IStakingRewards(stakingRewards).initialize(indexPool);
+    IStakingRewards(stakingRewards).initialize(indexPool, rewardsDuration);
     info.stakingRewards = stakingRewards;
     info.rewardAmount = rewardAmount;
     info.tokenType = StakingTokenType.NDX_POOL;
@@ -174,7 +177,8 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
    */
   function deployStakingRewardsForPoolUniswapPair(
     address indexPool,
-    uint88 rewardAmount
+    uint88 rewardAmount,
+    uint256 rewardsDuration
   )
     external
     override
@@ -203,7 +207,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
       stakingRewardsSalt
     );
 
-    IStakingRewards(stakingRewards).initialize(pairAddress);
+    IStakingRewards(stakingRewards).initialize(pairAddress, rewardsDuration);
     info.stakingRewards = stakingRewards;
     info.rewardAmount = rewardAmount;
     info.tokenType = StakingTokenType.NDX_POOL_UNISWAP_PAIR;
@@ -213,6 +217,9 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
 
 /* ==========  Rewards Distribution  ========== */
 
+  /**
+   * @dev Notifies all tokens of their pending rewards.
+   */
   function notifyRewardAmounts() public override {
     require(
       stakingTokens.length > 0,
@@ -223,17 +230,16 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     }
   }
 
+  /**
+   * @dev Notifies the staking pool for the token `stakingToken` of its pending rewards.
+   */
   function notifyRewardAmount(address stakingToken) public override {
     require(
       block.timestamp >= stakingRewardsGenesis,
       "StakingRewardsFactory::notifyRewardAmount: Not ready"
     );
 
-    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
-    require(
-      info.stakingRewards != address(0),
-      "StakingRewardsFactory::notifyRewardAmount: Not deployed"
-    );
+    StakingRewardsInfo storage info = _getRewards(stakingToken);
 
     if (info.rewardAmount > 0) {
       uint256 rewardAmount = info.rewardAmount;
@@ -254,12 +260,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
   }
 
   function getStakingRewards(address stakingToken) external override view returns (address) {
-    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
-    require(
-      info.stakingRewards != address(0),
-      "StakingRewardsFactory::getStakingRewards: Not deployed"
-    );
-
+    StakingRewardsInfo storage info = _getRewards(stakingToken);
     return info.stakingRewards;
   }
 
@@ -271,5 +272,15 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
       STAKING_REWARDS_IMPLEMENTATION_ID,
       stakingRewardsSalt
     );
+  }
+
+  /* ==========  Internal  ========== */
+  function _getRewards(address stakingToken) internal view returns (StakingRewardsInfo storage) {
+    StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
+    require(
+      info.stakingRewards != address(0),
+      "StakingRewardsFactory::_getRewards: Not deployed"
+    );
+    return info;
   }
 }
