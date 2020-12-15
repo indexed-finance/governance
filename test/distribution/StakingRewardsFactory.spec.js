@@ -332,6 +332,25 @@ describe('distribution:StakingRewardsFactory', async () => {
       ).to.be.rejectedWith(/StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Not an index pool/g);
     });
 
+    // the following 2 tests are not really necessary given the structure of the real pool factory
+    // but they get coverage to 100%
+
+    it('Reverts if index token is null address', async () => {
+      await mockPoolFactory.addIPool(zeroAddress);
+      const rewardValue = expandTo18Decimals(100);
+      await expect(
+        stakingFactory.deployStakingRewardsForPoolUniswapPair(zeroAddress, rewardValue, DURATION)
+      ).to.be.rejectedWith(/UniswapV2Library: ZERO_ADDRESS/g);
+    });
+
+    it('Reverts if token is weth', async () => {
+      await mockPoolFactory.addIPool(weth.address);
+      const rewardValue = expandTo18Decimals(100);
+      await expect(
+        stakingFactory.deployStakingRewardsForPoolUniswapPair(weth.address, rewardValue, DURATION)
+      ).to.be.rejectedWith(/UniswapV2Library: IDENTICAL_ADDRESSES/g);
+    });
+
     it('Allows the owner to deploy a staking pool for an index lp token <-> weth uniswap pair', async () => {
       const rewardValue = expandTo18Decimals(100);
       const {events} = await stakingFactory.deployStakingRewardsForPoolUniswapPair(stakingToken.address, rewardValue, DURATION).then(tx => tx.wait());
