@@ -27,13 +27,7 @@
     "deploy:timelock": "yarn prepare:timelock && yarn deploy:mainnet --tags Timelock",
     "build": "yarn clean:build && buidler compile",
     "coverage": "buidler coverage --network coverage --solcoverjs ./.solcover.js",
-    "test:ndx": "buidler test ./test/Ndx.spec.js",
-    "test:governor": "buidler test ./test/GovernorAlpha.spec.js",
-    "test:vester": "buidler test ./test/distribution/TreasuryVester.spec.js",
-    "test:reservoir": "buidler test ./test/distribution/Reservoir.spec.js",
-    "test:rewards": "buidler test ./test/distribution/StakingRewards.spec.js",
-    "test:rewards-factory": "buidler test ./test/distribution/StakingRewardsFactory.spec.js",
-    "lint": "prettier ./test/**/*.ts --check",
+
     "test": "buidler test",
     "prepublish": "yarn build && node ./scripts/purge-periphery-artifacts"
   },
