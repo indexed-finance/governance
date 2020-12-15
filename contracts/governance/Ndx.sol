@@ -3,6 +3,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
+
 contract Ndx {
   /// @notice EIP-20 token name for this token
   string public constant name = "Indexed";
@@ -13,8 +14,20 @@ contract Ndx {
   /// @notice EIP-20 token decimals for this token
   uint8 public constant decimals = 18;
 
+  /// @notice Address which may mint new tokens
+  address public minter;
+
+  /// @notice The timestamp after which minting may occur
+  uint256 public mintingAllowedAfter;
+
+  /// @notice Cap on the percentage of totalSupply that can be minted at each mint
+  uint8 public constant mintCap = 10;
+
+  /// @notice Minimum time between mints
+  uint32 public constant minimumTimeBetweenMints = 90 days;
+
   /// @notice Total number of tokens in circulation
-  uint256 public constant totalSupply = 10_000_000e18;
+  uint256 public totalSupply = 10_000_000e18;
 
   mapping(address => mapping(address => uint96)) internal allowances;
 
@@ -45,6 +58,9 @@ contract Ndx {
 
   mapping(address => uint256) public nonces;
 
+  /// @notice An event thats emitted when the minter address is changed
+  event MinterChanged(address minter, address newMinter);
+
   event DelegateChanged(
     address indexed delegator,
     address indexed fromDelegate,
@@ -65,9 +81,52 @@ contract Ndx {
     uint256 amount
   );
 
-  constructor(address account) public {
+  constructor(address account, address minter_, uint256 mintingAllowedAfter_) public {
+    require(
+      mintingAllowedAfter_ >= block.timestamp,
+      "Ndx::constructor: minting can only begin after deployment"
+    );
     balances[account] = uint96(totalSupply);
     emit Transfer(address(0), account, totalSupply);
+    minter = minter_;
+    emit MinterChanged(address(0), minter);
+    mintingAllowedAfter = mintingAllowedAfter_;
+  }
+
+  /**
+   * @notice Change the minter address
+   * @param minter_ The address of the new minter
+   */
+  function setMinter(address minter_) external {
+    require(msg.sender == minter, "Ndx::setMinter: only the minter can change the minter address");
+    emit MinterChanged(minter, minter_);
+    minter = minter_;
+  }
+
+  /**
+   * @notice Mint new tokens
+   * @param dst The address of the destination account
+   * @param rawAmount The number of tokens to be minted
+   */
+  function mint(address dst, uint rawAmount) external {
+    require(msg.sender == minter, "Ndx::mint: only the minter can mint");
+    require(block.timestamp >= mintingAllowedAfter, "Ndx::mint: minting not allowed yet");
+    require(dst != address(0), "Ndx::mint: cannot transfer to the zero address");
+
+    // record the mint
+    mintingAllowedAfter = SafeMath.add(block.timestamp, minimumTimeBetweenMints);
+
+    // mint the amount
+    uint96 amount = safe96(rawAmount, "Ndx::mint: amount exceeds 96 bits");
+    require(amount <= SafeMath.div(SafeMath.mul(totalSupply, mintCap), 100), "Ndx::mint: exceeded mint cap");
+    totalSupply = safe96(SafeMath.add(totalSupply, amount), "Ndx::mint: totalSupply exceeds 96 bits");
+
+    // transfer the amount to the recipient
+    balances[dst] = add96(balances[dst], amount, "Ndx::mint: transfer amount overflows");
+    emit Transfer(address(0), dst, amount);
+
+    // move delegates
+    _moveDelegates(address(0), delegates[dst], amount);
   }
 
   function allowance(address account, address spender)
