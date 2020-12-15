@@ -253,6 +253,39 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     }
   }
 
+  /**
+   * @dev Increases the staking rewards on the staking pool for `stakingToken`
+   * and notify the pool of the new rewards.
+   * Only allowed when the current rewards are zero and the staking pool has
+   * finished its last rewards period.
+   */
+  function increaseStakingRewards(address stakingToken, uint88 rewardAmount) external override onlyOwner {
+    require(rewardAmount > 0, "StakingRewardsFactory::increaseStakingRewards: Can not add 0 rewards.");
+    StakingRewardsInfo storage info = _getRewards(stakingToken);
+    require(
+      info.rewardAmount == 0,
+      "StakingRewardsFactory::increaseStakingRewards: Can not add rewards while pool still has pending rewards."
+    );
+    IStakingRewards pool = IStakingRewards(info.stakingRewards);
+    require(
+      block.timestamp >= pool.periodFinish(),
+      "StakingRewardsFactory::increaseStakingRewards: Previous rewards period must be complete to add rewards."
+    );
+    require(
+      IERC20(rewardsToken).transfer(address(pool), rewardAmount),
+      "StakingRewardsFactory::increaseStakingRewards: Transfer failed"
+    );
+    pool.notifyRewardAmount(rewardAmount);
+  }
+
+  /**
+   * @dev Updates the rewards duration on the staking pool for the token `stakingToken`.
+   */
+  function setRewardsDuration(address stakingToken, uint256 newDuration) external override onlyOwner {
+    StakingRewardsInfo storage info = _getRewards(stakingToken);
+    IStakingRewards(info.stakingRewards).setRewardsDuration(newDuration);
+  }
+
 /* ==========  Queries  ========== */
 
   function getStakingTokens() external override view returns (address[] memory) {
