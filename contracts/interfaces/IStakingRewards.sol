@@ -35,7 +35,6 @@ interface IStakingRewards {
 
   function rewardsToken() external view returns (IERC20);
 
-
   // Mutative
   function initialize(address stakingToken, uint256 rewardsDuration) external;
 
@@ -47,9 +46,9 @@ interface IStakingRewards {
 
   function exit() external;
 
+  // Restricted
   function notifyRewardAmount(uint256 reward) external;
 
-  // Restricted
   function recoverERC20(address tokenAddress, address recipient) external;
 
   function setRewardsDuration(uint256 rewardsDuration) external;
