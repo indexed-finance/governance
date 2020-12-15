@@ -3,7 +3,7 @@ const { expect } = require('chai')
 const { constants } = require('ethers')
 const { deployments, ethers } = bre;
 
-const { DELAY } = require('./utils');
+const { DELAY, fastForward } = require('./utils');
 
 describe('GovernorAlpha', () => {
   let wallet, address;
@@ -35,11 +35,34 @@ describe('GovernorAlpha', () => {
   })
 
   it('governor', async () => {
-    const votingPeriod = await governorAlpha.votingPeriod()
-    expect(votingPeriod.eq(40320)).to.be.true;
     const timelockAddress = await governorAlpha.timelock()
     expect(timelockAddress).to.be.eq(timelock.address)
     const uniFromGovernor = await governorAlpha.ndx()
     expect(uniFromGovernor).to.be.eq(ndx.address)
   })
+
+  describe('voting period', async () => {
+    it('votingPeriod initialized to 2880', async () => {
+      const votingPeriod = await governorAlpha.votingPeriod();
+      expect(votingPeriod).to.eq(2880);
+    })
+
+    it('permanentVotingPeriod set to 17280', async () => {
+      const permanentVotingPeriod = await governorAlpha.permanentVotingPeriod();
+      expect(permanentVotingPeriod).to.eq(17280);
+    })
+
+    it('setPermanentVotingPeriod: reverts if too early', async () => {
+      await expect(
+        governorAlpha.setPermanentVotingPeriod()
+      ).to.be.revertedWith('GovernorAlpha::setPermanentVotingPeriod: setting permanent voting period not allowed yet');
+    })
+
+    it('setPermanentVotingPeriod: adjusts voting period when allowed', async () => {
+      await fastForward(ethers.provider, 86400 * 14);
+      await governorAlpha.setPermanentVotingPeriod();
+      const votingPeriod = await governorAlpha.votingPeriod();
+      expect(votingPeriod).to.eq(17280);
+    })
+  });
 })
