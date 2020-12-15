@@ -12,13 +12,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 /* ==========  External Inheritance  ========== */
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-/* ==========  Internal Interfaces  ========== */
-import "../interfaces/IPoolFactory.sol";
-import "../interfaces/IStakingRewards.sol";
-
-/* ==========  Internal Libraries  ========== */
-import "../lib/UniswapV2AddressLibrary.sol";
-
 /* ==========  Internal Inheritance  ========== */
 import "../interfaces/IStakingRewardsFactory.sol";
 
@@ -40,12 +33,12 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
   /**
    * @dev Address of the pool factory - used to verify staking token eligibility.
    */
-  IPoolFactory public override immutable poolFactory;
+  address public override immutable poolFactory;
 
   /**
    * @dev The address of the proxy manager - used to deploy staking pools.
    */
-  IDelegateCallProxyManager public override immutable proxyManager;
+  address public override immutable proxyManager;
 
   /**
    * @dev The address of the token to distribute.
@@ -120,8 +113,8 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
       "StakingRewardsFactory::constructor: genesis too soon"
     );
     stakingRewardsGenesis = stakingRewardsGenesis_;
-    proxyManager = IDelegateCallProxyManager(proxyManager_);
-    poolFactory = IPoolFactory(poolFactory_);
+    proxyManager = proxyManager_;
+    poolFactory = poolFactory_;
     uniswapFactory = uniswapFactory_;
     weth = weth_;
   }
@@ -151,11 +144,11 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
       "StakingRewardsFactory::deployStakingRewardsForPool: Already deployed"
     );
     require(
-      poolFactory.isRecognizedPool(indexPool),
+      IPoolFactory(poolFactory).isRecognizedPool(indexPool),
       "StakingRewardsFactory::deployStakingRewardsForPool: Not an index pool."
     );
     bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(indexPool));
-    address stakingRewards = proxyManager.deployProxyManyToOne(
+    address stakingRewards = IDelegateCallProxyManager(proxyManager).deployProxyManyToOne(
       STAKING_REWARDS_IMPLEMENTATION_ID,
       stakingRewardsSalt
     );
@@ -186,7 +179,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     onlyOwner
   {
     require(
-      poolFactory.isRecognizedPool(indexPool),
+      IPoolFactory(poolFactory).isRecognizedPool(indexPool),
       "StakingRewardsFactory::deployStakingRewardsForPoolUniswapPair: Not an index pool."
     );
 
@@ -203,7 +196,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     );
 
     bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(pairAddress));
-    address stakingRewards = proxyManager.deployProxyManyToOne(
+    address stakingRewards = IDelegateCallProxyManager(proxyManager).deployProxyManyToOne(
       STAKING_REWARDS_IMPLEMENTATION_ID,
       stakingRewardsSalt
     );
@@ -315,7 +308,7 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
   function computeStakingRewardsAddress(address stakingToken) external override view returns (address) {
     bytes32 stakingRewardsSalt = keccak256(abi.encodePacked(stakingToken));
     return SaltyLib.computeProxyAddressManyToOne(
-      address(proxyManager),
+      proxyManager,
       address(this),
       STAKING_REWARDS_IMPLEMENTATION_ID,
       stakingRewardsSalt
@@ -331,4 +324,65 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     );
     return info;
   }
+}
+
+
+library UniswapV2AddressLibrary {
+  // returns sorted token addresses, used to handle return values from pairs sorted in this order
+  function sortTokens(address tokenA, address tokenB)
+    internal
+    pure
+    returns (address token0, address token1)
+  {
+    require(tokenA != tokenB, "UniswapV2Library: IDENTICAL_ADDRESSES");
+    (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+    require(token0 != address(0), "UniswapV2Library: ZERO_ADDRESS");
+  }
+
+  function calculatePair(
+    address factory,
+    address token0,
+    address token1
+  ) internal pure returns (address pair) {
+    pair = address(
+      uint256(
+        keccak256(
+          abi.encodePacked(
+            hex"ff",
+            factory,
+            keccak256(abi.encodePacked(token0, token1)),
+            hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f" // init code hash
+          )
+        )
+      )
+    );
+  }
+
+  // calculates the CREATE2 address for a pair without making any external calls
+  function pairFor(
+    address factory,
+    address tokenA,
+    address tokenB
+  ) internal pure returns (address pair) {
+    (address token0, address token1) = sortTokens(tokenA, tokenB);
+    pair = calculatePair(factory, token0, token1);
+  }
+}
+
+
+interface IPoolFactory {
+  function isRecognizedPool(address pool) external view returns (bool);
+}
+
+
+interface IStakingRewards {
+  function initialize(address stakingToken, uint256 rewardsDuration) external;
+
+  function recoverERC20(address tokenAddress, address recipient) external;
+
+  function notifyRewardAmount(uint256 reward) external;
+
+  function setRewardsDuration(uint256 rewardsDuration) external;
+
+  function periodFinish() external view returns (uint256);
 }
