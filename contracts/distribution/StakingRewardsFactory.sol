@@ -286,6 +286,20 @@ contract StakingRewardsFactory is Ownable, IStakingRewardsFactory {
     IStakingRewards(info.stakingRewards).setRewardsDuration(newDuration);
   }
 
+/* ==========  Token Recovery  ========== */
+
+  /**
+   * @dev Recovers the balance of `tokenAddress` on the staking pool for the token `stakingToken`.
+   * The token to recover must not be the staking token or the rewards token for that pool.
+   * The balance in `tokenAddress` owned by the pool will be sent to the owner of the rewards factory.
+   * @param stakingToken Address of the staking token whose staking pool the tokens will be recovered from.
+   * @param tokenAddress Address of the token to recover from the staking pool.
+   */
+  function recoverERC20(address stakingToken, address tokenAddress) external override {
+    StakingRewardsInfo storage info = _getRewards(stakingToken);
+    IStakingRewards(info.stakingRewards).recoverERC20(tokenAddress, owner());
+  }
+
 /* ==========  Queries  ========== */
 
   function getStakingTokens() external override view returns (address[] memory) {
