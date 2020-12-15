@@ -5,8 +5,11 @@ import "../interfaces/ITimelock.sol";
 
 
 contract GovernorAlpha {
-  /// @notice The name of this contract
+  /// @dev The name of this contract
   string public constant name = "Indexed Governor Alpha";
+  
+  /// @dev The voting period which will be set after setVotingPeriodAfter has passed.
+  uint256 public constant permanentVotingPeriod = 17_280; // ~3 days in blocks (assuming 15s blocks)
 
   /**
    * @dev The number of votes in support of a proposal required in order for a
@@ -40,9 +43,12 @@ contract GovernorAlpha {
   /**
    * @dev The duration of voting on a proposal, in blocks
    */
-  function votingPeriod() public pure returns (uint256) {
-    return 40_320; // ~7 days in blocks (assuming 15s blocks)
-  }
+  uint256 public votingPeriod = 2_880; // ~12 hours in blocks (assuming 15s blocks)
+
+  /**
+   * @dev The timestamp after which votingPeriod can be set to the permanent value.
+   */
+  uint256 public immutable setVotingPeriodAfter;
 
   /**
    * @dev The address of the Indexed Protocol Timelock
@@ -182,9 +188,22 @@ contract GovernorAlpha {
    */
   event ProposalExecuted(uint256 id);
 
-  constructor(address timelock_, address ndx_) public {
+  constructor(address timelock_, address ndx_, uint256 setVotingPeriodAfter_) public {
     timelock = ITimelock(timelock_);
     ndx = NdxInterface(ndx_);
+    setVotingPeriodAfter = setVotingPeriodAfter_;
+  }
+
+  /**
+   * @dev Sets votingPeriod to the permanent value.
+   * Can only be called after setVotingPeriodAfter
+   */
+  function setPermanentVotingPeriod() external {
+    require(
+      block.timestamp >= setVotingPeriodAfter,
+      "GovernorAlpha::setPermanentVotingPeriod: setting permanent voting period not allowed yet"
+    );
+    votingPeriod = permanentVotingPeriod;
   }
 
   function propose(
@@ -228,7 +247,7 @@ contract GovernorAlpha {
     }
 
     uint256 startBlock = add256(block.number, votingDelay());
-    uint256 endBlock = add256(startBlock, votingPeriod());
+    uint256 endBlock = add256(startBlock, votingPeriod);
 
     proposalCount++;
     Proposal memory newProposal = Proposal({
