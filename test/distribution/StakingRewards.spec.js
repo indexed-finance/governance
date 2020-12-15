@@ -408,6 +408,12 @@ describe('distribution:StakingRewards', async () => {
       ).to.be.rejectedWith(/Caller is not RewardsDistribution contract/g);
     })
 
+    it('should revert if duration is 0', async () => {
+      await expect(
+        localStakingRewards.setRewardsDuration(0)
+      ).to.be.rejectedWith(/Can not set null rewards duration/g);
+    })
+
 		it('should increase rewards duration before starting distribution', async () => {
 			const oldDuration = await localStakingRewards.rewardsDuration();
 			expect(oldDuration.eq(sevenDays)).to.be.true;
