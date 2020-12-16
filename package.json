@@ -20,14 +20,25 @@
     "prepare:ndx": "yarn prepare-build --contracts Ndx",
     "prepare:governor": "yarn prepare-build --contracts GovernorAlpha",
     "prepare:timelock": "yarn prepare-build --contracts Timelock",
+    "prepare:staking-factory": "yarn prepare-build --contracts StakingRewardsFactory",
+    "prepare:staking-rewards": "yarn prepare-build --contracts StakingRewards",
+    "prepare:team-vesting": "yarn prepare-build --contracts DelegatingVester",
+    "prepare:treasury-lock": "yarn prepare-build --contracts TreasuryLock",
+    "prepare:treasury-vester": "yarn prepare-build --contracts TreasuryVester",
+
     "deploy:rinkeby": "buidler --network rinkeby deploy",
     "deploy:mainnet": "buidler --network mainnet deploy",
     "deploy:ndx": "yarn prepare:ndx && yarn deploy:mainnet --tags Ndx",
     "deploy:governor": "yarn prepare:governor && yarn deploy:mainnet --tags GovernorAlpha",
     "deploy:timelock": "yarn prepare:timelock && yarn deploy:mainnet --tags Timelock",
+    "deploy:staking-factory": "yarn prepare:staking-factory && yarn deploy:mainnet --tags StakingRewardsFactory",
+    "deploy:staking-rewards": "yarn prepare:staking-rewards && yarn deploy:mainnet --tags StakingRewards",
+    "deploy:team-vesting": "yarn prepare:team-vesting && yarn deploy:mainnet --tags DelegatingVester",
+    "deploy:treasury-lock": "yarn prepare:treasury-lock && yarn deploy:mainnet --tags TreasuryLock",
+    "deploy:treasury-vester": "yarn prepare:treasury-vester && yarn deploy:mainnet --tags TreasuryVester",
+
     "build": "yarn clean:build && buidler compile",
     "coverage": "buidler coverage --network coverage --solcoverjs ./.solcover.js",
-
     "test": "buidler test",
     "prepublish": "yarn build && node ./scripts/purge-periphery-artifacts"
   },
