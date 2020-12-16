@@ -40,7 +40,8 @@ module.exports = {
     artifacts: [
       'node_modules/@uniswap/v2-core/build',
       'node_modules/@uniswap/v2-periphery/build',
-      'node_modules/@indexed-finance/proxies/artifacts'
+      'node_modules/@indexed-finance/proxies/artifacts',
+      'node_modules/@indexed-finance/indexed-core/artifacts'
     ],
     deployments: {
       rinkeby: [
