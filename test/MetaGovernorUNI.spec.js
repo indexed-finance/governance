@@ -76,6 +76,12 @@ describe('MetaGovernorUNI', () => {
     let balance, metaProposal, proposal;
     setupTests();
 
+    it('rejects if caller has no votes', async () => {
+      await expect(
+        metaGovernor.connect(signer2).castVote(1, true)
+      ).to.be.revertedWith('MetaGovernorUNI::_castVote: caller has no delegated NDX')
+    })
+
     it('casts vote', async () => {
       balance = await ndx.balanceOf(deployer);
       await metaGovernor.castVote(1, true);
