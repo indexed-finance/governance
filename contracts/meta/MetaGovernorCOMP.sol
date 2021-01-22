@@ -5,6 +5,27 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 
+/**
+ * @title MetaGovernorCOMP
+ * @dev Meta-governance contract for Compound's GovernorAlpha.
+ *
+ * This contract enables NDX holders to vote, by simple majority, on how to cast
+ * votes for Compound governance proposals.
+ *
+ * Each Compound proposal is wrapped as a meta proposal, which has an endBlock which
+ * ends some number of blocks prior to the end of the real proposal in order to give
+ * NDX holders time to cast meta votes prior to casting votes for the entire dao.
+ *
+ * This contract counts voting power from users the same way as the typical GovernorAlpha,
+ * which is to call getPriorVotes to check the delegation a voting account held at the time
+ * the external proposal began.
+ *
+ * Once a meta proposal has ended, it may be executed to cast votes on Compound. If the proposal
+ * has more votes in favor than against, it will cast votes supporting the proposal. Otherwise,
+ * it will cast votes against the proposal.
+ *
+ * This contract may not be used to submit proposals to Compound, only to vote on them.
+ */
 contract MetaGovernorCOMP {
   using SafeMath for uint256;
 
@@ -112,6 +133,7 @@ contract MetaGovernorCOMP {
   }
 
   function _getMetaProposal(uint256 proposalId) internal returns (MetaProposal storage) {
+    // Get the meta proposal if it exists, else initialize the block fields using the external proposal.
     MetaProposal storage proposal = proposals[proposalId];
     if (proposal.startBlock == 0) {
       IGovernorAlpha.Proposal memory externalProposal = compGovernor.proposals(proposalId);
@@ -137,6 +159,10 @@ contract MetaGovernorCOMP {
       "MetaGovernorCOMP::_castVote: voter already voted"
     );
     uint96 votes = ndx.getPriorVotes(voter, proposal.startBlock);
+    require(
+      votes > 0,
+      "MetaGovernorCOMP::_castVote: caller has no delegated NDX"
+    );
 
     if (support) {
       proposal.forVotes = SafeMath.add(proposal.forVotes, votes);
