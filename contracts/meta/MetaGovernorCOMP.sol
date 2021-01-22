@@ -24,6 +24,14 @@ contract MetaGovernorCOMP {
   /** @dev The address of the COMP GovernorAlpha */
   IGovernorAlpha public immutable compGovernor;
 
+  /**
+   * @param startBlock The block at which voting begins: holders must delegate their votes prior to this block
+   * @param endBlock The block at which voting ends: votes must be cast prior to this block
+   * @param forVotes Current number of votes in favor of this proposal
+   * @param againstVotes Current number of votes in opposition to this proposal
+   * @param voteSubmitted Flag marking whether the vote has been cast on the external governor
+   * @param receipts Receipts of ballots for the entire set of voters
+   */
   struct MetaProposal {
     uint256 startBlock;
     uint256 endBlock;
@@ -79,7 +87,7 @@ contract MetaGovernorCOMP {
   }
 
   function getReceipt(uint256 proposalId, address voter)
-    public
+    external
     view
     returns (Receipt memory)
   {
@@ -99,7 +107,7 @@ contract MetaGovernorCOMP {
     emit ExternalVoteSubmitted(proposalId, support);
   }
 
-  function castVote(uint256 proposalId, bool support) public {
+  function castVote(uint256 proposalId, bool support) external {
     return _castVote(msg.sender, proposalId, support);
   }
 
@@ -143,7 +151,7 @@ contract MetaGovernorCOMP {
     emit MetaVoteCast(voter, proposalId, support, votes);
   }
 
-  function state(uint256 proposalId) public view returns (MetaProposalState) {
+  function state(uint256 proposalId) external view returns (MetaProposalState) {
     MetaProposal storage proposal = proposals[proposalId];
     return _state(proposal);
   }
