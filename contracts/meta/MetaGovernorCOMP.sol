@@ -128,10 +128,6 @@ contract MetaGovernorCOMP {
     emit ExternalVoteSubmitted(proposalId, support);
   }
 
-  function castVote(uint256 proposalId, bool support) external {
-    return _castVote(msg.sender, proposalId, support);
-  }
-
   function _getMetaProposal(uint256 proposalId) internal returns (MetaProposal storage) {
     // Get the meta proposal if it exists, else initialize the block fields using the external proposal.
     MetaProposal storage proposal = proposals[proposalId];
@@ -143,22 +139,18 @@ contract MetaGovernorCOMP {
     return proposal;
   }
 
-  function _castVote(
-    address voter,
-    uint256 proposalId,
-    bool support
-  ) internal {
+  function castVote(uint256 proposalId, bool support) external {
     MetaProposal storage proposal = _getMetaProposal(proposalId);
     require(
       _state(proposal) == MetaProposalState.Active,
       "MetaGovernorCOMP::_castVote: meta proposal not active"
     );
-    Receipt storage receipt = proposal.receipts[voter];
+    Receipt storage receipt = proposal.receipts[msg.sender];
     require(
       receipt.hasVoted == false,
       "MetaGovernorCOMP::_castVote: voter already voted"
     );
-    uint96 votes = ndx.getPriorVotes(voter, proposal.startBlock);
+    uint96 votes = ndx.getPriorVotes(msg.sender, proposal.startBlock);
     require(
       votes > 0,
       "MetaGovernorCOMP::_castVote: caller has no delegated NDX"
@@ -174,7 +166,7 @@ contract MetaGovernorCOMP {
     receipt.support = support;
     receipt.votes = votes;
 
-    emit MetaVoteCast(voter, proposalId, support, votes);
+    emit MetaVoteCast(msg.sender, proposalId, support, votes);
   }
 
   function state(uint256 proposalId) external view returns (MetaProposalState) {
