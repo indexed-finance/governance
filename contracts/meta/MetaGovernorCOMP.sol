@@ -2,8 +2,6 @@
 pragma solidity =0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-
 
 /**
  * @title MetaGovernorCOMP
@@ -27,8 +25,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
  * This contract may not be used to submit proposals to Compound, only to vote on them.
  */
 contract MetaGovernorCOMP {
-  using SafeMath for uint256;
-
   /** @dev The name of this contract */
   string public constant name = "Indexed COMP Meta Governor";
 
@@ -36,7 +32,7 @@ contract MetaGovernorCOMP {
    * @dev The number of blocks subtracted from the endBlock of an external
    * proposal to set the end block of a meta proposal.
    */
-  uint256 public immutable votingGracePeriod;
+  uint32 public immutable votingGracePeriod;
 
   /** @dev The address of the Indexed governance token */
   NdxInterface public immutable ndx;
@@ -54,10 +50,10 @@ contract MetaGovernorCOMP {
    * @param receipts Receipts of ballots for the entire set of voters
    */
   struct MetaProposal {
-    uint256 startBlock;
-    uint256 endBlock;
-    uint256 forVotes;
-    uint256 againstVotes;
+    uint32 startBlock;
+    uint32 endBlock;
+    uint96 forVotes;
+    uint96 againstVotes;
     bool voteSubmitted;
     mapping(address => Receipt) receipts;
   }
@@ -101,7 +97,7 @@ contract MetaGovernorCOMP {
     bool support
   );
 
-  constructor(address ndx_, address compGovernor_, uint256 votingGracePeriod_) public {
+  constructor(address ndx_, address compGovernor_, uint32 votingGracePeriod_) public {
     ndx = NdxInterface(ndx_);
     compGovernor = IGovernorAlpha(compGovernor_);
     votingGracePeriod = votingGracePeriod_;
@@ -133,8 +129,8 @@ contract MetaGovernorCOMP {
     MetaProposal storage proposal = proposals[proposalId];
     if (proposal.startBlock == 0) {
       IGovernorAlpha.Proposal memory externalProposal = compGovernor.proposals(proposalId);
-      proposal.startBlock = externalProposal.startBlock;
-      proposal.endBlock = SafeMath.sub(externalProposal.endBlock, votingGracePeriod);
+      proposal.startBlock = safe32(externalProposal.startBlock);
+      proposal.endBlock = sub32(safe32(externalProposal.endBlock), votingGracePeriod);
     }
     return proposal;
   }
@@ -157,9 +153,9 @@ contract MetaGovernorCOMP {
     );
 
     if (support) {
-      proposal.forVotes = SafeMath.add(proposal.forVotes, votes);
+      proposal.forVotes = add96(proposal.forVotes, votes);
     } else {
-      proposal.againstVotes = SafeMath.add(proposal.againstVotes, votes);
+      proposal.againstVotes = add96(proposal.againstVotes, votes);
     }
 
     receipt.hasVoted = true;
@@ -187,6 +183,22 @@ contract MetaGovernorCOMP {
       return MetaProposalState.Succeeded;
     }
     return MetaProposalState.Defeated;
+  }
+
+  function add96(uint96 a, uint96 b) internal pure returns (uint96) {
+    uint96 c = a + b;
+    require(c >= a, "addition overflow");
+    return c;
+  }
+
+  function safe32(uint256 a) internal pure returns (uint32) {
+    require(a <= uint32(-1), "uint32 overflow");
+    return uint32(a);
+  }
+
+  function sub32(uint32 a, uint32 b) internal pure returns (uint32) {
+    require(b <= a, "subtraction underflow");
+    return a - b;
   }
 }
 
